@@ -361,9 +361,9 @@
         <div class="quantity-select">
           <label>Choose Your</label>
           <div class="stepper">
-            <button id="minus">&#x25B2;</button>
+            <button id="minus">&#x25BC;</button>
             <span id="qty">2</span>
-            <button id="plus">&#x25BC;</button>
+            <button id="plus">&#x25B2;</button>
           </div>
         </div>
 
@@ -443,15 +443,29 @@
   </div>
 
   <script>
-    // Simple stepper logic
+    // Simple stepper logic with price update
     const qtyEl = document.getElementById("qty");
+    const priceEl = document.querySelector(".price span");
+    const unitPrice = 6;
+
+    const updatePrice = () => {
+      priceEl.textContent = `$${(unitPrice * parseInt(qtyEl.textContent)).toFixed(2)}`;
+    };
+
     document.getElementById("plus").addEventListener("click", () => {
       qtyEl.textContent = parseInt(qtyEl.textContent) + 1;
+      updatePrice();
     });
     document.getElementById("minus").addEventListener("click", () => {
       const current = parseInt(qtyEl.textContent);
-      if (current > 1) qtyEl.textContent = current - 1;
+      if (current > 1) {
+        qtyEl.textContent = current - 1;
+        updatePrice();
+      }
     });
+
+    // Initialize price
+    updatePrice();
   </script>
 </body>
 </html>
