@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Figma Design Preview</title>
+    <style>
+      /* Basic full-screen layout */
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f3f4f6;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .figma-embed {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+
+      /* Optional: message for no-iframe fallback */
+      .no-iframe-msg {
+        display: none;
+        text-align: center;
+        color: #555;
+      }
+
+      iframe:disabled ~ .no-iframe-msg {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Figma embed -->
+    <iframe
+      class="figma-embed"
+      src="https://www.figma.com/embed?embed_host=share&url=https%3A%2F%2Fwww.figma.com%2Ffile%2FaOlVVm9x8wd1pMG5PQQM8W%2FTest%3Fnode-id%3D0-1"
+      allowfullscreen
+    ></iframe>
+    <div class="no-iframe-msg">
+      <p>
+        Unable to load the Figma preview. You can open it directly
+        <a
+          href="https://www.figma.com/file/aOlVVm9x8wd1pMG5PQQM8W/Test?node-id=0-1"
+          >here</a
+        >.
+      </p>
+    </div>
+  </body>
+</html>
