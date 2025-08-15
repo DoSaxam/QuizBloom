@@ -183,6 +183,7 @@
     /* Categories grid */
     .cat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .cat-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 16px; border: 1px solid var(--border); background: var(--bg-3); font-weight: 700; }
+    .cat-item.active { background: rgba(124,92,255,0.22); border-color: rgba(124,92,255,0.6); }
 
     /* Skeletons */
     .skeleton { position: relative; overflow: hidden; background: rgba(255,255,255,0.08); border-radius: 12px; }
@@ -698,6 +699,13 @@
       if (id === 'leaderboard') renderLeaderboard();
       if (id === 'profile') renderProfile();
       if (id === 'categories') { renderCategories(qs('#categories'), appState.categories); enhanceInteractiveElements(); }
+      if (id === 'difficulty') {
+        const diffButtons = qsa('#screen-difficulty [data-setup-diff]');
+        diffButtons.forEach(b=> b.classList.toggle('active', b.dataset.setupDiff === (appState.setup.difficulty||'easy')));
+        const type = qs('#diffType'); if (type) type.value = appState.setup.type || 'multiple';
+        const amt = qs('#diffAmount'); if (amt) amt.value = String(appState.setup.amount || 10);
+        const t = qs('#diffTime'); if (t) t.value = String(appState.setup.timePerQuestion || 20);
+      }
       audio.play('nav');
     }
 
@@ -795,6 +803,7 @@
       const filter = (qs('#catSearch')?.value || '').toLowerCase();
       const view = cats.filter(c=>c.name.toLowerCase().includes(filter));
       if(!view.length){ container.innerHTML = '<div class="pill" style="opacity:.8">No categories</div>'; return; }
+      view.sort((a,b)=> a.name.localeCompare(b.name));
       view.slice(0, 48).forEach(c => {
         const b = document.createElement('button');
         b.className = 'cat-item ripple-wrap'; b.dataset.id = c.id;
@@ -1127,10 +1136,10 @@
       };
 
       // Advanced Setup
-      qsa('#screen-setup [data-setup-diff]').forEach(btn => btn.addEventListener('click', () => { qsa('#screen-setup [data-setup-diff]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }));
+      qsa('#screen-setup [data-setup-diff]').forEach(btn => btn.addEventListener('click', () => { qsa('#screen-setup [data-setup-diff]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); appState.setup.difficulty = btn.dataset.setupDiff; storage.save('rq_setup', appState.setup); }));
       qs('#setupStart').onclick = () => {
-        const categoryBtn = qs('#setupCats .chip.active'); const category = categoryBtn ? Number(categoryBtn.dataset.id) : null;
-        const diffBtn = qsa('#screen-setup [data-setup-diff]').find(b=>b.classList.contains('active')) || { dataset: { setupDiff: 'easy' } };
+        const categoryBtn = qs('#setupCats .chip.active'); const category = categoryBtn ? Number(categoryBtn.dataset.id) : appState.setup.category ?? null;
+        const diffBtn = qsa('#screen-setup [data-setup-diff]').find(b=>b.classList.contains('active')) || { dataset: { setupDiff: appState.setup.difficulty || 'easy' } };
         const difficulty = diffBtn.dataset.setupDiff; const amount = clampNum(qs('#setupAmount').value, 5, 30, 10);
         const timePerQuestion = clampNum(qs('#setupTime').value, 8, 90, 20); const type = qs('#setupType').value;
         appState.setup = { category, difficulty, amount, timePerQuestion, type }; storage.save('rq_setup', appState.setup);
@@ -1147,7 +1156,7 @@
       qs('#gotoHome').onclick = () => showScreen('home');
       qs('#saveScoreBtn').onclick = saveToLeaderboard;
       qs('#shareBtn').onclick = async()=>{
-        try{ const text = `I scored ${qs('#resultScorePoints').textContent} in Rovio Quiz!`; if(navigator.share){ await navigator.share({ title:'Rovio Quiz', text, url: location.href }); } else { await navigator.clipboard.writeText(text+' '+location.href); toast('Copied to clipboard'); } }catch{}
+        try{ const text = `I scored ${qs('#resultScorePoints').textContent} in Rovio Quiz!`; if(navigator.share){ await navigator.share({ title:'Rovio Quiz', text, url: location.href }); } else { await navigator.clipboard.writeText(text+' '+(location?.href||'')); toast('Copied to clipboard'); } }catch{}
       };
 
       // Settings
@@ -1158,6 +1167,11 @@
       const vol = qs('#volumeRange'); if (vol) vol.addEventListener('input', () => { audio.volume = Number(vol.value); storage.save('rq_volume', audio.volume); });
       qs('#textScale').addEventListener('input', ()=>{ appState.textScale = Number(qs('#textScale').value); storage.save('rq_text_scale', appState.textScale); applyTextScale(); });
       qsa('[data-lang]').forEach(btn=> btn.onclick = ()=>{ appState.language = btn.dataset.lang; storage.save('rq_lang', appState.language); applyLanguage(); });
+      // Default selected states
+      qsa('[data-theme]').forEach(b=> b.classList.toggle('active', b.dataset.theme === appState.theme));
+      qsa('[data-lang]').forEach(b=> b.classList.toggle('active', b.dataset.lang === appState.language));
+      qsa('[data-sound]').forEach(b=> b.classList.toggle('active', (b.dataset.sound==='on') === !!audio.enabled));
+      qsa('[data-haptics]').forEach(b=> b.classList.toggle('active', (b.dataset.haptics==='on') === !!haptics.enabled));
       qs('#resetData').onclick = () => { localStorage.clear(); location.reload(); };
 
       // Profile Edit
