@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <title>QuizBee — Premium Trivia</title>
+  <meta name="description" content="QuizBee: a beautiful, fast, single-file premium trivia game with achievements, power-ups, daily challenge, bees, and buttery micro-interactions.">
+
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT: '#7c3aed', 50: '#f3e8ff', 100: '#e9d5ff', 200: '#d8b4fe', 300: '#c084fc', 400: '#a855f7', 500: '#7c3aed', 600: '#6d28d9', 700: '#5b21b6', 800: '#4c1d95', 900: '#3b0764' }}, boxShadow: { glass: '0 10px 30px rgba(2,6,23,0.25)', soft: '0 6px 20px rgba(2,6,23,0.18)' },},}, darkMode: 'media'};</script>
+
+  <!-- GSAP for animations -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/MotionPathPlugin.min.js"></script>
+
+  <style>
+    :root {
+      --card-bg: rgba(255, 255, 255, 0.12);
+      --card-bg-dark: rgba(15, 23, 42, 0.35);
+      --glass-border: rgba(255, 255, 255, 0.22);
+      --noise-opacity: .06;
+      --ring-size: 88;
+      --ring-stroke: 8;
+      --accent: #7c3aed;
+    }
+    html, body { height: 100%; background: radial-gradient(1200px 800px at 20% -10%, #1e293b 0%, #0f172a 35%, #0b1220 100%); color: #e2e8f0; }
+    body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+
+    /* Glass cards */
+    .glass { background: var(--card-bg-dark); backdrop-filter: blur(14px) saturate(120%); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 10px 30px rgba(2,6,23,0.35); }
+    .glass-soft { background: var(--card-bg-dark); backdrop-filter: blur(10px) saturate(120%); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 8px 24px rgba(2,6,23,0.26); }
+    .card-hover { transition: transform .18s ease, box-shadow .18s ease; }
+    .card-hover:where(:hover,:focus-visible) { transform: translateY(-1px) scale(1.01); box-shadow: 0 14px 36px rgba(2,6,23,0.45); }
+    .pressable { transition: transform 120ms ease, box-shadow 120ms ease; }
+    .pressable:active { transform: scale(0.98); }
+
+    /* Shimmer for logotype */
+    .shimmer { position: relative; background: linear-gradient(90deg, rgba(255,255,255,.7), #fff, rgba(255,255,255,.7)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .shimmer::after { content: ""; position: absolute; inset: 0; background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,.35) 20%, transparent 40%); transform: translateX(-100%); animation: shine 3s linear infinite; }
+    @keyframes shine { 0% { transform: translateX(-100%);} 100% { transform: translateX(100%);} }
+
+    /* Subtle noise overlay */
+    .noise { pointer-events: none; position: fixed; inset: 0; opacity: var(--noise-opacity); mix-blend-mode: soft-light; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.35'/></svg>"); }
+
+    /* Ripple */
+    .ripple { position: relative; overflow: hidden; }
+    .ripple::after { content: ""; position: absolute; inset: 0; background: radial-gradient(120px 120px at var(--x) var(--y), rgba(255,255,255,.28), transparent 50%); opacity: 0; transform: scale(0.8); transition: opacity .35s ease, transform .35s ease; }
+    .ripple:active::after { opacity: 1; transform: scale(1); transition: 0s; }
+
+    /* Focus ring */
+    .focus-ring:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; border-radius: .75rem; }
+
+    /* Page transition base */
+    .screen { opacity: 0; transform: translateX(6px); display: none; }
+    .screen.active { display: block; }
+
+    /* Timer ring base */
+    .timer-ring circle { transition: stroke-dashoffset .2s linear; }
+
+    /* Confetti canvas */
+    #confetti-canvas { pointer-events: none; position: fixed; inset: 0; z-index: 60; }
+
+    /* Bottom-safe padding on iOS */
+    .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0.75rem); }
+
+    /* Pull to refresh indicator */
+    .ptr-indicator { height: 0; overflow: visible; text-align: center; color: #c084fc; font-size: .8rem; transition: transform .2s ease; }
+
+    /* Hide scrollbars in certain strips */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Reduced motion respect */
+    @media (prefers-reduced-motion: reduce) {
+      .pressable, .card-hover { transition: none; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <!-- SVG Icon Sprite -->
+  <svg width="0" height="0" class="absolute"><defs>
+    <symbol id="icon-home" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3 2 12h3v8h6v-6h2v6h6v-8h3z"/></symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></symbol>
+    <symbol id="icon-trophy" viewBox="0 0 24 24"><path fill="currentColor" d="M18 2H6v3H3v3c0 3.1 2.4 5.6 5.5 6v2.1C6.4 17 5 18.3 5 20v2h14v-2c0-1.7-1.4-3-3.5-3.9V14c3.1-.4 5.5-2.9 5.5-6V5h-3V2zM5 8V7h1v2.7C5.4 9.2 5 8.6 5 8zm14 0c0 .6-.4 1.2-1 1.7V7h1v1z"/></symbol>
+    <symbol id="icon-store" viewBox="0 0 24 24"><path fill="currentColor" d="M3 9h18l-2-5H5zM3 11v9h18v-9z"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><path fill="currentColor" d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm9.4 4.6l-2.1.3a7.9 7.9 0 0 1-.8 2l1.3 1.7-2.4 2.4-1.7-1.3a7.9 7.9 0 0 1-2 .8l-.3 2.1H9.8l-.3-2.1a7.9 7.9 0 0 1-2-.8l-1.7 1.3L3.4 16l1.3-1.7a7.9 7.9 0 0 1-.8-2l-2.1-.3V9.8l2.1-.3c.2-.7.5-1.3.8-2L3.4 5.8 5.8 3.4l1.7 1.3c.6-.3 1.3-.6 2-.8l.3-2.1h3.4l.3 2.1c.7.2 1.3.5 2 .8l1.7-1.3 2.4 2.4-1.3 1.7c.3.6.6 1.3.8 2l2.1.3v3.4z"/></symbol>
+    <symbol id="icon-sound" viewBox="0 0 24 24"><path fill="currentColor" d="M4 9v6h4l5 4V5L8 9H4zm11.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zm2.5 0a7 7 0 0 1-4 6.3v-1.9a5 5 0 0 0 0-8.8V5.7A7 7 0 0 1 18 12z"/></symbol>
+    <symbol id="icon-star" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.9 6 6.6 1-4.8 4.7 1.2 6.6L12 17l-5.9 3.3 1.2-6.6L2.5 9l6.6-1z"/></symbol>
+    <symbol id="icon-lightning" viewBox="0 0 24 24"><path fill="currentColor" d="M13 2L3 14h7l-1 8 10-12h-7z"/></symbol>
+    <symbol id="icon-heart" viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7-4.4-9.3-8A5.4 5.4 0 0 1 12 5.3 5.4 5.4 0 0 1 21.3 13c-2.3 3.6-9.3 8-9.3 8z"/></symbol>
+    <symbol id="icon-coin" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.5 2 2 5 2 8.5v7C2 19 6.5 22 12 22s10-3 10-6.5v-7C22 5 17.5 2 12 2zm0 2c4.4 0 8 .9 8 2.5S16.4 9 12 9 4 8.1 4 6.5 7.6 4 12 4zm0 16c-4.4 0-8-.9-8-2.5V12c1.8 1.2 5 2 8 2s6.2-.8 8-2v5.5c0 1.6-3.6 2.5-8 2.5z"/></symbol>
+    <symbol id="icon-crown" viewBox="0 0 24 24"><path fill="currentColor" d="M3 7l4 4 5-7 5 7 4-4v12H3z"/></symbol>
+    <symbol id="icon-reload" viewBox="0 0 24 24"><path fill="currentColor" d="M12 6V3L8 7l4 4V8c2.8 0 5 2.2 5 5s-2.2 5-5 5a5 5 0 0 1-4.9-4H6a7 7 0 1 0 6-8z"/></symbol>
+  </defs></svg>
+
+  <!-- Background Bees Layer -->
+  <div id="bee-layer" class="pointer-events-none fixed inset-0 -z-10"></div>
+  <div class="noise"></div>
+
+  <!-- App Container -->
+  <div id="app" class="flex-1 flex flex-col">
+    <!-- Header -->
+    <header class="px-5 pt-6 pb-3">
+      <div class="flex items-center justify-between">
+        <h1 class="text-3xl tracking-tight font-semibold shimmer select-none" aria-label="QuizBee">QuizBee</h1>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1 text-amber-300" title="Coins"><svg class="w-5 h-5"><use href="#icon-coin"/></svg><span id="coins-label" class="text-sm">0</span></div>
+          <div class="flex items-center gap-1 text-fuchsia-300" title="XP"><svg class="w-5 h-5"><use href="#icon-star"/></svg><span id="xp-label" class="text-sm">0</span></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Screens -->
+    <main id="screens" class="flex-1 px-4 pb-24 safe-bottom">
+      <!-- Home Screen -->
+      <section id="screen-home" class="screen active">
+        <div class="grid gap-4">
+          <!-- Daily Streak & Progress Ring -->
+          <div class="glass rounded-2xl p-4 card-hover" aria-label="Daily streak">
+            <div class="flex items-center gap-4">
+              <svg class="w-20 h-20 timer-ring" viewBox="0 0 100 100" aria-hidden="true">
+                <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.15)" stroke-width="8" fill="none"/>
+                <circle id="streak-ring" cx="50" cy="50" r="40" stroke="#c084fc" stroke-linecap="round" stroke-width="8" fill="none" stroke-dasharray="251.2" stroke-dashoffset="0"/>
+              </svg>
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <svg class="w-5 h-5 text-rose-300"><use href="#icon-heart"/></svg>
+                  <p class="text-sm text-slate-300">Daily Streak</p>
+                </div>
+                <p id="streak-label" class="text-xl font-semibold">0 days</p>
+                <p class="text-xs text-slate-400">Keep your streak to boost rewards</p>
+              </div>
+              <button id="daily-challenge-btn" class="pressable ripple px-4 py-2 rounded-xl bg-brand-500 text-white shadow-soft focus-ring" aria-label="Start Daily Challenge">
+                <div class="flex items-center gap-2"><svg class="w-5 h-5 text-white"><use href="#icon-crown"/></svg><span>Daily Challenge</span></div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Daily Challenge Card -->
+          <div class="glass-soft rounded-2xl p-4 card-hover" aria-label="Daily Challenge card">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-slate-300">One try • 10 questions</p>
+                <p class="text-lg font-semibold">Boosted rewards today</p>
+              </div>
+              <button id="start-daily-btn" class="pressable ripple px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white focus-ring" aria-label="Play Daily">Play</button>
+            </div>
+          </div>
+
+          <!-- Quick Start -->
+          <button id="quick-start-btn" class="pressable ripple w-full bg-brand-500 hover:bg-brand-400 text-white rounded-2xl py-3 shadow-soft focus-ring" aria-label="Quick Start">
+            <div class="flex items-center justify-center gap-2"><svg class="w-5 h-5 text-white"><use href="#icon-play"/></svg><span>Quick Start</span></div>
+          </button>
+
+          <!-- Recent Achievements Strip -->
+          <div class="rounded-2xl p-3 glass-soft">
+            <div class="flex items-center gap-2 mb-2"><svg class="w-5 h-5 text-amber-300"><use href="#icon-trophy"/></svg><span class="text-sm text-slate-200">Recent Achievements</span></div>
+            <div id="recent-achievements" class="flex gap-3 overflow-x-auto no-scrollbar"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Play Screen -->
+      <section id="screen-play" class="screen">
+        <div class="ptr-indicator" id="ptr-indicator">↓ Pull to refresh</div>
+
+        <!-- Controls -->
+        <div class="glass rounded-2xl p-3 mb-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2 overflow-x-auto no-scrollbar">
+              <div id="category-chips" class="flex items-center gap-2"></div>
+            </div>
+            <button id="reload-btn" class="pressable ripple p-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 focus-ring" aria-label="Reload questions">
+              <svg class="w-5 h-5 text-slate-200"><use href="#icon-reload"/></svg>
+            </button>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <select id="difficulty-select" class="bg-slate-800/60 rounded-xl p-2 focus-ring">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+            <select id="amount-select" class="bg-slate-800/60 rounded-xl p-2 focus-ring">
+              <option value="5">5 Qs</option>
+              <option value="10" selected>10 Qs</option>
+              <option value="15">15 Qs</option>
+            </select>
+            <select id="type-select" class="bg-slate-800/60 rounded-xl p-2 focus-ring">
+              <option value="multiple" selected>Multiple</option>
+              <option value="boolean">True/False</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Question Card -->
+        <div id="question-card" class="glass rounded-2xl p-4 card-hover">
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-sm text-slate-300" id="step-label">Q 0/0</div>
+            <div class="timer-ring w-12 h-12">
+              <svg viewBox="0 0 100 100" class="w-12 h-12">
+                <circle cx="50" cy="50" r="42" stroke="rgba(255,255,255,0.15)" stroke-width="8" fill="none"/>
+                <circle id="timer-circle" cx="50" cy="50" r="42" stroke="#a855f7" stroke-width="8" stroke-linecap="round" fill="none" stroke-dasharray="263.76" stroke-dashoffset="0" />
+              </svg>
+            </div>
+          </div>
+          <div id="question-text" class="text-lg font-medium min-h-[3rem]">Loading…</div>
+          <div id="answers" class="mt-4 grid gap-2"></div>
+
+          <div class="mt-4 flex items-center justify-between">
+            <div id="progress-bar" class="h-2 bg-slate-700 rounded-full overflow-hidden flex-1 mr-3"><div id="progress-fill" class="h-full bg-brand-500" style="width:0%"></div></div>
+            <div class="text-xs text-slate-300"><span id="xp-ticker">+0 XP</span> • <span id="coin-ticker">+0</span> <svg class="inline w-4 h-4 text-amber-300 align-[-2px]"><use href="#icon-coin"/></svg></div>
+          </div>
+
+          <!-- Power-ups -->
+          <div class="mt-4 flex items-center gap-2">
+            <button id="power-5050" class="pressable ripple flex-1 p-2 rounded-xl bg-indigo-600/80 text-white focus-ring disabled:opacity-40 disabled:cursor-not-allowed" aria-label="50/50"><svg class="inline w-5 h-5 mr-1"><use href="#icon-lightning"/></svg>50/50</button>
+            <button id="power-time" class="pressable ripple flex-1 p-2 rounded-xl bg-emerald-600/80 text-white focus-ring disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Add Time"><svg class="inline w-5 h-5 mr-1"><use href="#icon-lightning"/></svg>Add Time</button>
+            <button id="power-skip" class="pressable ripple flex-1 p-2 rounded-xl bg-rose-600/80 text-white focus-ring disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Skip"><svg class="inline w-5 h-5 mr-1"><use href="#icon-lightning"/></svg>Skip</button>
+          </div>
+        </div>
+
+        <!-- Skeleton Loader -->
+        <div id="play-skeleton" class="hidden mt-3 space-y-3">
+          <div class="glass rounded-2xl p-4 animate-pulse">
+            <div class="h-4 bg-white/10 rounded w-1/3 mb-3"></div>
+            <div class="h-6 bg-white/10 rounded w-2/3 mb-2"></div>
+            <div class="grid gap-2">
+              <div class="h-10 bg-white/10 rounded"></div>
+              <div class="h-10 bg-white/10 rounded"></div>
+              <div class="h-10 bg-white/10 rounded"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Achievements Screen -->
+      <section id="screen-achievements" class="screen">
+        <div class="glass rounded-2xl p-4 mb-3">
+          <div class="flex items-center gap-2 mb-2"><svg class="w-6 h-6 text-amber-300"><use href="#icon-trophy"/></svg><h2 class="text-lg font-semibold">Achievements</h2></div>
+          <p class="text-sm text-slate-300">Unlock badges by playing. Tap to view criteria and claim rewards.</p>
+        </div>
+        <div id="achievements-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+      </section>
+
+      <!-- Store Screen -->
+      <section id="screen-store" class="screen">
+        <div class="glass rounded-2xl p-4 mb-3">
+          <div class="flex items-center gap-2 mb-2"><svg class="w-6 h-6 text-amber-200"><use href="#icon-store"/></svg><h2 class="text-lg font-semibold">Store</h2></div>
+          <p class="text-sm text-slate-300">Spend coins to buy power-ups and coin packs. No real payments.</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-4" id="store-packs"></div>
+        <div class="glass rounded-2xl p-4">
+          <div class="flex items-center gap-2 mb-2"><svg class="w-5 h-5 text-slate-200"><use href="#icon-lightning"/></svg><h3 class="font-medium">Inventory</h3></div>
+          <div id="inventory" class="grid grid-cols-2 gap-2"></div>
+        </div>
+      </section>
+
+      <!-- Settings Screen -->
+      <section id="screen-settings" class="screen">
+        <div class="glass rounded-2xl p-4 mb-3">
+          <div class="flex items-center gap-2 mb-2"><svg class="w-6 h-6 text-slate-200"><use href="#icon-settings"/></svg><h2 class="text-lg font-semibold">Settings</h2></div>
+          <div class="grid gap-3">
+            <label class="flex items-center justify-between p-3 rounded-xl bg-slate-800/60"><span>Sound</span><input id="toggle-sound" type="checkbox" class="accent-brand-500"></label>
+            <label class="flex items-center justify-between p-3 rounded-xl bg-slate-800/60"><span>Haptics</span><input id="toggle-haptics" type="checkbox" class="accent-brand-500" checked></label>
+            <label class="flex items-center justify-between p-3 rounded-xl bg-slate-800/60"><span>Animations</span><select id="select-anim" class="bg-slate-900 rounded p-1"><option>Low</option><option selected>Med</option><option>High</option></select></label>
+            <label class="flex items-center justify-between p-3 rounded-xl bg-slate-800/60"><span>Font Size</span><select id="select-font" class="bg-slate-900 rounded p-1"><option>Small</option><option selected>Medium</option><option>Large</option></select></label>
+            <button id="btn-reset" class="pressable ripple px-4 py-2 rounded-xl bg-rose-600/80 text-white focus-ring">Reset Data</button>
+          </div>
+          <div class="mt-4 text-xs text-slate-400">
+            <p class="font-medium mb-1">About</p>
+            <p>QuizBee v1.0 • Private by design. Data lives in your browser only.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navbar -->
+    <nav id="navbar" class="fixed bottom-0 inset-x-0 z-40 safe-bottom">
+      <div class="mx-4 mb-3 glass rounded-2xl shadow-glass">
+        <div class="grid grid-cols-5 text-slate-200">
+          <button data-route="/home" class="nav-item pressable ripple py-3 flex flex-col items-center gap-1 focus-ring" aria-label="Home"><svg class="w-6 h-6"><use href="#icon-home"/></svg><span class="text-xs">Home</span></button>
+          <button data-route="/play" class="nav-item pressable ripple py-3 flex flex-col items-center gap-1 focus-ring" aria-label="Play"><svg class="w-6 h-6"><use href="#icon-play"/></svg><span class="text-xs">Play</span></button>
+          <button data-route="/achievements" class="nav-item pressable ripple py-3 flex flex-col items-center gap-1 focus-ring" aria-label="Achievements"><svg class="w-6 h-6"><use href="#icon-trophy"/></svg><span class="text-xs">Achievements</span></button>
+          <button data-route="/store" class="nav-item pressable ripple py-3 flex flex-col items-center gap-1 focus-ring" aria-label="Store"><svg class="w-6 h-6"><use href="#icon-store"/></svg><span class="text-xs">Store</span></button>
+          <button data-route="/settings" class="nav-item pressable ripple py-3 flex flex-col items-center gap-1 focus-ring" aria-label="Settings"><svg class="w-6 h-6"><use href="#icon-settings"/></svg><span class="text-xs">Settings</span></button>
+        </div>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Toasts / Modals / Confetti -->
+  <div id="toast-host" class="fixed top-4 inset-x-0 z-50 flex flex-col items-center gap-2"></div>
+  <div id="modal-host" class="fixed inset-0 z-50 hidden items-center justify-center"></div>
+  <canvas id="confetti-canvas"></canvas>
+
+  <script>
+  // ===============================
+  // Utilities
+  // ===============================
+  const Utils = (() => {
+    const htmlEntityDecode = (str) => {
+      const txt = document.createElement('textarea');
+      txt.innerHTML = str;
+      return txt.value;
+    };
+    const safeText = (str) => String(str || '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+    const shuffle = (arr, rng = Math.random) => {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    const debounce = (fn, wait) => {
+      let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+    };
+    const throttle = (fn, limit) => {
+      let inThrottle = false, lastArgs = null; return (...args) => {
+        if (!inThrottle) { fn(...args); inThrottle = true; setTimeout(() => { inThrottle = false; if (lastArgs) { fn(...lastArgs); lastArgs = null; } }, limit); }
+        else lastArgs = args;
+      };
+    };
+    const formatTime = (ms) => {
+      const s = Math.ceil(ms / 1000); return s + 's';
+    };
+    const seededPRNG = (seedStr) => {
+      let h = 2166136261 >>> 0; for (let i = 0; i < seedStr.length; i++) { h ^= seedStr.charCodeAt(i); h = Math.imul(h, 16777619); }
+      return () => { h += 0x6D2B79F5; let t = Math.imul(h ^ (h >>> 15), 1 | h); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    };
+    const uid = () => Math.random().toString(36).slice(2, 10);
+    return { htmlEntityDecode, safeText, shuffle, clamp, debounce, throttle, formatTime, seededPRNG, uid };
+  })();
+
+  // ===============================
+  // Haptics
+  // ===============================
+  const Haptics = (() => {
+    const isCap = !!(window.Capacitor && window.Capacitor.Haptics);
+    const canVibrate = 'vibrate' in navigator;
+    const impact = (style) => {
+      const enabled = Store.get().settings.haptics;
+      if (!enabled) return;
+      if (isCap) {
+        try { window.Capacitor.Haptics.impact({ style }); } catch {}
+      } else if (canVibrate) {
+        if (style === 'MEDIUM') navigator.vibrate(20); else if (style === 'HEAVY') navigator.vibrate([10, 30, 10]); else navigator.vibrate(10);
+      }
+    };
+    return { tap: () => impact('LIGHT'), medium: () => impact('MEDIUM'), strong: () => impact('HEAVY') };
+  })();
+
+  // ===============================
+  // Audio (WebAudio + base64 buffers + synth fallback)
+  // ===============================
+  const AudioFX = (() => {
+    const state = { ctx: null, buffers: {}, enabled: true };
+    const base64Wavs = {
+      // Very small synthesized blips, 8-bit PCM WAVs (approx.)
+      tap: 'UklGRhQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAAgAAAAPwAAAP8AAP8AAAABAQEBAgICAwMDAwQEBAUFBQYGBgYHBwcICA==',
+      correct: 'UklGRlQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAAgAAAAPwAAAP8AAP4AAAD/AAAAAQEBAgICAwMDAwQEBAUFBgYGBwcHCAgICQkJ',
+      wrong: 'UklGRlQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAAgAAAAPwAAAP8AAP8AAAD+AAAAAQABAQICAgMDAwMEBQUGBgYHBwgICAkJCQkK',
+      levelup: 'UklGRmQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAAgAAAAPwAAAP8AAP4AAAD/AAAAAQEBAgICAwMDAwQEBAUFBgYGBwcHCAgICQkJCgoK'
+    };
+    const atobSafe = (b64) => Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+    const ensure = () => { if (!state.ctx) state.ctx = new (window.AudioContext || window.webkitAudioContext)(); return state.ctx; };
+    const decodeAll = async () => {
+      const ctx = ensure();
+      await Promise.all(Object.entries(base64Wavs).map(async ([k, v]) => {
+        try { const buf = await ctx.decodeAudioData(atobSafe(v)); state.buffers[k] = buf; } catch (e) { state.buffers[k] = null; }
+      }));
+    };
+    const synth = (type = 'sine', f = 440, t = 0.09, g = 0.12) => {
+      const ctx = ensure(); const o = ctx.createOscillator(); const ga = ctx.createGain(); o.type = type; o.frequency.value = f; ga.gain.value = g; o.connect(ga).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + t); };
+    const play = (name) => {
+      if (!Store.get().settings.sound) return; const ctx = ensure();
+      const buf = state.buffers[name]; if (buf) { const s = ctx.createBufferSource(); s.buffer = buf; s.connect(ctx.destination); s.start(); }
+      else {
+        // Fallback synthesized tones
+        if (name === 'tap') synth('triangle', 520, .05, .08);
+        else if (name === 'correct') { synth('sine', 880, .06, .1); setTimeout(() => synth('sine', 1320, .07, .08), 70); }
+        else if (name === 'wrong') { synth('square', 220, .08, .06); }
+        else if (name === 'levelup') { synth('sine', 660, .08, .09); setTimeout(() => synth('sine', 990, .08, .08), 90); setTimeout(() => synth('sine', 1320, .09, .07), 180); }
+      }
+    };
+    decodeAll();
+    return { play };
+  })();
+
+  // ===============================
+  // Store (state + persistence)
+  // ===============================
+  const Store = (() => {
+    const key = 'quizbee:v1';
+    const defaults = {
+      xp: 0,
+      coins: 0,
+      correctStreak: 0,
+      daily: { lastDate: null, playedToday: false },
+      lives: { current: 5, max: 5, regenAt: null },
+      inventory: { fifty: 0, addTime: 0, skip: 0, streakFreeze: 0 },
+      settings: { sound: true, haptics: true, anim: 'Med', font: 'Medium' },
+      achievements: { unlocked: [], claimed: [] },
+      cache: { categories: [], questions: {}, recent: [] },
+      rewardQueue: []
+    };
+    let state = null; const listeners = new Set();
+    const load = () => {
+      try { const raw = localStorage.getItem(key); if (raw) state = { ...defaults, ...JSON.parse(raw) }; else state = structuredClone(defaults); } catch { state = structuredClone(defaults); }
+      return state;
+    };
+    const save = () => { try { localStorage.setItem(key, JSON.stringify(state)); } catch {} };
+    const get = () => (state || load());
+    const set = (partial) => { state = { ...get(), ...partial }; save(); emit(); };
+    const patch = (fn) => { const s = get(); fn(s); save(); emit(); };
+    const emit = () => listeners.forEach(l => l(get()));
+    const subscribe = (l) => { listeners.add(l); return () => listeners.delete(l); };
+    const reset = () => { state = structuredClone(defaults); save(); emit(); };
+    const addXP = (amount) => patch(s => { s.xp += amount; });
+    const addCoins = (amount) => patch(s => { s.coins += amount; });
+    return { get, set, patch, subscribe, reset, addXP, addCoins };
+  })();
+
+  // ===============================
+  // Router (hash-based) + GSAP transitions
+  // ===============================
+  const Router = (() => {
+    const routes = ['home', 'play', 'achievements', 'store', 'settings'];
+    let current = 'home';
+    const show = (name) => {
+      if (!routes.includes(name)) name = 'home';
+      if (current === name) return;
+      const prevEl = document.getElementById('screen-' + current);
+      const nextEl = document.getElementById('screen-' + name);
+      if (!prevEl || !nextEl) return;
+      // Animate out previous, in next
+      nextEl.classList.add('active');
+      gsap.set(nextEl, { x: 16, opacity: 0, display: 'block' });
+      gsap.timeline({ defaults: { ease: 'power2.out', duration: .22 } })
+        .to(prevEl, { x: -14, opacity: 0 }, 0)
+        .to(nextEl, { x: 0, opacity: 1 }, 0)
+        .add(() => { prevEl.classList.remove('active'); prevEl.style.display = 'none'; current = name; window.location.hash = '#' + name; Ui.updateNavbar(name); }, '>-0.02');
+    };
+    const init = () => {
+      const hash = window.location.hash.replace('#','');
+      if (routes.includes(hash)) { current = hash; document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('screen-' + current).classList.add('active'); }
+      window.addEventListener('hashchange', () => { const h = window.location.hash.replace('#',''); if (routes.includes(h)) show(h); });
+      document.querySelectorAll('#navbar .nav-item').forEach(btn => btn.addEventListener('click', () => { const r = btn.getAttribute('data-route').slice(1); Haptics.tap(); AudioFX.play('tap'); show(r); }));
+    };
+    return { init, show };
+  })();
+
+  // ===============================
+  // API (OpenTDB) with retry, decode, caching
+  // ===============================
+  const Api = (() => {
+    const base = 'https://opentdb.com';
+    const decodeQuestion = (q) => {
+      const dec = (s) => Utils.htmlEntityDecode(s || '');
+      const correct = dec(q.correct_answer);
+      const incorrect = (q.incorrect_answers || []).map(dec);
+      const all = Utils.shuffle([correct, ...incorrect]);
+      return { category: dec(q.category), type: q.type, difficulty: q.difficulty, question: dec(q.question), correct, answers: all };
+    };
+    const categories = async () => {
+      try {
+        const r = await fetch(base + '/api_category.php'); const j = await r.json(); const cats = (j.trivia_categories || []).map(c => ({ id: c.id, name: c.name }));
+        Store.patch(s => { s.cache.categories = cats; });
+        return cats;
+      } catch (e) { return Store.get().cache.categories || []; }
+    };
+    const backoff = (attempt) => Math.min(1000 * Math.pow(2, attempt) + Math.random() * 250, 6000);
+    const fetchQuestions = async (opts) => {
+      const { amount = 10, category, difficulty = 'medium', type = 'multiple', seed } = opts || {};
+      const params = new URLSearchParams({ amount, difficulty, type }); if (category) params.set('category', category);
+      // Seed not supported directly; use tokenization by caching set per seed
+      const key = JSON.stringify({ amount, category, difficulty, type, seed: seed || null });
+      const cache = Store.get().cache.questions[key];
+      if (cache) return cache;
+      let attempt = 0; let lastErr = null;
+      while (attempt < 4) {
+        try {
+          const r = await fetch(`${base}/api.php?${params.toString()}`);
+          if (!r.ok) throw new Error('Network');
+          const j = await r.json();
+          if (j.response_code !== 0 || !Array.isArray(j.results) || j.results.length === 0) throw new Error('No results');
+          const qs = j.results.map(decodeQuestion);
+          Store.patch(s => { s.cache.questions[key] = qs; s.cache.recent = (s.cache.recent || []).slice(-20); s.cache.recent.push({ key, ts: Date.now() }); });
+          return qs;
+        } catch (e) {
+          lastErr = e; await new Promise(res => setTimeout(res, backoff(attempt++)));
+        }
+      }
+      throw lastErr || new Error('Failed');
+    };
+    return { categories, fetchQuestions };
+  })();
+
+  // ===============================
+  // Achievements Engine
+  // ===============================
+  const Achievements = (() => {
+    const defs = [
+      { id: 'first-win', name: 'First Win', desc: 'Finish a round', icon: 'trophy', test: (e,s) => e.type==='round_end' && e.correctCount>0 },
+      { id: 'perfect', name: 'Perfect Round', desc: 'Answer all correctly', icon: 'star', test: (e,s) => e.type==='round_end' && e.correctCount===e.total },
+      { id: 'fast', name: 'Fast Thinker', desc: 'Answer in under 3s', icon: 'lightning', test: (e,s) => e.type==='answer' && e.timeMs<=3000 && e.correct },
+      { id: 'ten-row', name: 'Ten in a Row', desc: '10 correct streak', icon: 'crown', test: (e,s) => s.correctStreak>=10 },
+      { id: 'night-owl', name: 'Night Owl', desc: 'Play after 11pm', icon: 'star', test: (e,s) => { const h=new Date().getHours(); return h>=23 || h<5; } },
+      { id: 'category-master', name: 'Category Master', desc: 'Win in same category 3x', icon: 'crown', test: (e,s) => e.type==='round_end' && e.category && (e.correctRate>=0.7) },
+      { id: 'streak-7', name: 'Weekly Streak', desc: '7-day login streak', icon: 'heart', test: (e,s) => (s.daily && s.daily.streakDays)>=7 },
+      { id: 'early-bird', name: 'Early Bird', desc: 'Play before 7am', icon: 'star', test: (e,s) => { const h=new Date().getHours(); return h<7; } },
+      { id: 'power-user', name: 'Power Player', desc: 'Use 3 power-ups', icon: 'lightning', test: (e,s) => (e.type==='power' && e.countUsed>=3) },
+      { id: 'coin-hoarder', name: 'Coin Collector', desc: 'Reach 500 coins', icon: 'coin', test: (e,s) => s.coins>=500 },
+      { id: 'level-5', name: 'Level Up 5', desc: 'Reach level 5', icon: 'crown', test: (e,s) => levelFromXP(s.xp)>=5 },
+      { id: 'daily-champ', name: 'Daily Champ', desc: 'Win daily challenge', icon: 'trophy', test: (e,s) => e.type==='daily_win' }
+    ];
+    const levelFromXP = (xp) => Math.floor(1 + Math.sqrt(xp / 120));
+    const list = () => defs.map(d => ({ ...d, unlocked: Store.get().achievements.unlocked.includes(d.id) }));
+    const notify = (event) => {
+      const s = Store.get(); const newly = [];
+      defs.forEach(d => {
+        if (!s.achievements.unlocked.includes(d.id) && d.test(event, s)) {
+          newly.push(d.id);
+        }
+      });
+      if (newly.length) {
+        Store.patch(st => { st.achievements.unlocked.push(...newly); });
+        Ui.toast('Achievement unlocked!', 'success');
+        Ui.confetti(350);
+      }
+    };
+    const claim = (id) => {
+      const s = Store.get(); if (!s.achievements.unlocked.includes(id) || s.achievements.claimed.includes(id)) return;
+      Store.patch(st => { st.achievements.claimed.push(id); st.coins += 50; });
+      Ui.toast('+50 coins claimed', 'success');
+      AudioFX.play('levelup'); Haptics.strong();
+    };
+    return { list, notify, claim, levelFromXP };
+  })();
+
+  // ===============================
+  // UI helpers: toasts, modals, confetti, ripples, navbar state
+  // ===============================
+  const Ui = (() => {
+    const toastHost = document.getElementById('toast-host');
+    const modalHost = document.getElementById('modal-host');
+    const confettiCanvas = document.getElementById('confetti-canvas');
+    const cctx = confettiCanvas.getContext('2d');
+    const resizeCanvas = () => { confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight; };
+    window.addEventListener('resize', resizeCanvas); resizeCanvas();
+
+    const toast = (msg, type = 'info', action) => {
+      const el = document.createElement('div');
+      el.className = `glass-soft rounded-xl px-3 py-2 text-sm shadow-soft flex items-center gap-2 ${type==='success'?'text-emerald-200':type==='error'?'text-rose-200':'text-slate-100'}`;
+      el.innerHTML = `<span>${Utils.safeText(msg)}</span>` + (action ? `<button class="ml-2 px-2 py-1 rounded bg-white/10">${Utils.safeText(action.label)}</button>` : '');
+      toastHost.appendChild(el); gsap.fromTo(el, { y: -10, opacity: 0 }, { y: 0, opacity: 1, ease: 'power2.out', duration: .18 });
+      const close = () => gsap.to(el, { y: -10, opacity: 0, duration: .2, onComplete: () => el.remove() });
+      setTimeout(close, 3000);
+      if (action) el.querySelector('button').addEventListener('click', () => { action.onClick?.(); close(); });
+    };
+
+    const modal = (contentHTML) => {
+      modalHost.className = 'fixed inset-0 z-50 flex items-center justify-center';
+      modalHost.innerHTML = `<div class="absolute inset-0 bg-black/60"></div><div class="glass rounded-2xl p-4 max-w-md w-[92vw]">${contentHTML}</div>`;
+      gsap.fromTo(modalHost.querySelector('.glass'), { y: 16, opacity: 0 }, { y: 0, opacity: 1, duration: .22, ease: 'power2.out' });
+      modalHost.addEventListener('click', (e) => { if (e.target === modalHost.firstChild) close(); });
+      const close = () => { gsap.to(modalHost, { opacity: 0, duration: .2, onComplete: () => { modalHost.className = 'fixed inset-0 z-50 hidden items-center justify-center'; modalHost.innerHTML = ''; } }); };
+      return { close };
+    };
+
+    const confetti = (count = 250) => {
+      const parts = Array.from({ length: count }, () => ({
+        x: Math.random() * confettiCanvas.width,
+        y: -10,
+        vx: (Math.random() - .5) * 3,
+        vy: 2 + Math.random() * 2,
+        size: 2 + Math.random() * 3,
+        color: `hsl(${Math.floor(Math.random()*360)}, 90%, 60%)`,
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - .5) * .2
+      }));
+      let alive = true;
+      const step = () => {
+        cctx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+        parts.forEach(p => { p.x += p.vx; p.y += p.vy; p.rot += p.vr; cctx.save(); cctx.translate(p.x, p.y); cctx.rotate(p.rot); cctx.fillStyle = p.color; cctx.fillRect(-p.size/2, -p.size/2, p.size, p.size); cctx.restore(); });
+        if (parts.some(p => p.y < confettiCanvas.height + 10)) requestAnimationFrame(step); else alive = false;
+      };
+      step();
+      return () => { alive = false; };
+    };
+
+    const addRipples = () => {
+      document.body.addEventListener('pointerdown', (e) => {
+        const t = e.target.closest('.ripple'); if (!t) return; const rect = t.getBoundingClientRect(); t.style.setProperty('--x', (e.clientX - rect.left) + 'px'); t.style.setProperty('--y', (e.clientY - rect.top) + 'px');
+      }, { passive: true });
+    };
+
+    const updateNavbar = (route) => {
+      document.querySelectorAll('#navbar .nav-item').forEach(btn => {
+        const active = btn.getAttribute('data-route') === '/' + route; btn.classList.toggle('text-white', active);
+      });
+    };
+
+    return { toast, modal, confetti, addRipples, updateNavbar };
+  })();
+
+  // ===============================
+  // Background Bees system with GSAP
+  // ===============================
+  const Bees = (() => {
+    const layer = document.getElementById('bee-layer');
+    const bees = [];
+    const beeSVG = (i) => `<svg class="absolute" width="18" height="18" viewBox="0 0 24 24" style="opacity:${0.26 + Math.random()*0.25}"><g fill="none" stroke="currentColor" stroke-width="1.5" color="#fca5a5"><ellipse cx="12" cy="12" rx="6" ry="4" fill="#fbbf24" opacity=".8"/><circle cx="9" cy="11" r="1" fill="#111827"/><circle cx="15" cy="11" r="1" fill="#111827"/><path d="M6 12h12"/></g></svg>`;
+    const safeZone = () => ({ x: window.innerWidth*0.18, y: 120, w: window.innerWidth*0.64, h: Math.max(280, window.innerHeight*0.48) });
+    const randomPath = () => {
+      const s = safeZone();
+      // Choose points outside safe zone bounds
+      const pad = 24; const W = window.innerWidth, H = window.innerHeight;
+      const pick = () => {
+        let x=0,y=0; let tries=0; do { x = Math.random()*W; y = Math.random()*H; tries++; } while (x>s.x && x<s.x+s.w && y>s.y && y<s.y+s.h && tries<20);
+        return { x, y };
+      };
+      const p1 = pick(), p2 = pick(), p3 = pick(), p4 = pick();
+      return [p1,p2,p3,p4];
+    };
+    const spawn = (n=8) => {
+      layer.innerHTML = '';
+      for (let i=0;i<n;i++) {
+        const el = document.createElement('div'); el.innerHTML = beeSVG(i); const bee = el.firstChild; layer.appendChild(bee);
+        const tl = gsap.timeline({ repeat: -1, defaults: { ease: 'power1.inOut' } });
+        const loop = () => {
+          const p = randomPath();
+          tl.to(bee, { duration: 6+Math.random()*5, motionPath: { path: [{x:p[0].x,y:p[0].y},{x:p[1].x,y:p[1].y},{x:p[2].x,y:p[2].y},{x:p[3].x,y:p[3].y}], curviness: 1.2 }, rotation: "+=360", scale: 0.8+Math.random()*0.5 }, 0)
+            .to(bee, { duration: 2, opacity: 0.35 + Math.random()*0.25 }, '<');
+        };
+        loop(); tl.eventCallback('onComplete', loop);
+        bees.push({ bee, tl });
+      }
+    };
+    const converge = () => {
+      const center = { x: window.innerWidth/2, y: window.innerHeight/2 };
+      bees.forEach(({ bee }) => gsap.to(bee, { x: center.x, y: center.y, scale: 1.2, duration: .35, yoyo: true, repeat: 1, ease: 'power2.out' }));
+    };
+    const disperse = () => {
+      bees.forEach(({ bee }) => gsap.to(bee, { x: '+=' + (Math.random()*120-60), y: '+=' + (Math.random()*120-60), duration: .25, ease: 'power1.out' }));
+    };
+    window.addEventListener('resize', Utils.debounce(() => spawn(bees.length || 8), 250));
+    return { spawn, converge, disperse };
+  })();
+
+  // ===============================
+  // Game logic
+  // ===============================
+  const Game = (() => {
+    const elQuestion = document.getElementById('question-text');
+    const elAnswers = document.getElementById('answers');
+    const elStep = document.getElementById('step-label');
+    const elTimer = document.getElementById('timer-circle');
+    const elProgress = document.getElementById('progress-fill');
+    const elXPTicker = document.getElementById('xp-ticker');
+    const elCoinTicker = document.getElementById('coin-ticker');
+    const elSkeleton = document.getElementById('play-skeleton');
+    const power5050 = document.getElementById('power-5050');
+    const powerTime = document.getElementById('power-time');
+    const powerSkip = document.getElementById('power-skip');
+
+    let round = null; // { qs, idx, correct, used: { fifty, time, skip }, timeLeftMs, totalTimeMs, timerId, startedAt }
+
+    const ringLen = 2 * Math.PI * 42; // r=42
+
+    const enablePowers = () => {
+      const s = Store.get();
+      power5050.disabled = s.inventory.fifty <= 0;
+      powerTime.disabled = s.inventory.addTime <= 0;
+      powerSkip.disabled = s.inventory.skip <= 0;
+    };
+
+    const startRound = async ({ amount, category, difficulty, type, seed, daily=false } = {}) => {
+      Ui.toast('Fetching questions…'); toggleSkeleton(true);
+      try {
+        const qs = await Api.fetchQuestions({ amount, category, difficulty, type, seed });
+        round = { qs, idx: 0, correct: 0, used: { fifty: 0, time: 0, skip: 0 }, totalTimeMs: 20000, timeLeftMs: 20000, timerId: null, startedAt: Date.now(), daily };
+        render(); startTimer();
+      } catch (e) {
+        Ui.toast('Network error', 'error', { label: 'Try again', onClick: () => startRound({ amount, category, difficulty, type, seed, daily }) });
+      } finally { toggleSkeleton(false); }
+    };
+
+    const toggleSkeleton = (show) => { elSkeleton.classList.toggle('hidden', !show); document.getElementById('question-card').classList.toggle('opacity-70', show); };
+
+    const startTimer = () => {
+      if (!round) return; const step = () => {
+        round.timeLeftMs = Math.max(0, round.totalTimeMs - (Date.now() - round.startedAt));
+        const ratio = round.timeLeftMs / round.totalTimeMs; elTimer.style.strokeDasharray = String(ringLen); elTimer.style.strokeDashoffset = String((1 - ratio) * ringLen);
+        if (round.timeLeftMs <= 0) { choose(null); return; }
+        round.timerId = requestAnimationFrame(step);
+      }; round.timerId = requestAnimationFrame(step);
+    };
+
+    const stopTimer = () => { if (round?.timerId) cancelAnimationFrame(round.timerId); };
+
+    const render = () => {
+      if (!round) return;
+      const q = round.qs[round.idx];
+      elStep.textContent = `Q ${round.idx+1}/${round.qs.length}`;
+      elQuestion.textContent = q.question;
+      elAnswers.innerHTML = '';
+      q.answers.forEach(ans => {
+        const btn = document.createElement('button');
+        btn.className = 'pressable ripple w-full text-left bg-slate-800/70 hover:bg-slate-800 text-slate-100 rounded-xl p-3 focus-ring';
+        btn.textContent = ans; btn.setAttribute('data-ans', ans);
+        btn.addEventListener('click', () => { choose(ans); });
+        elAnswers.appendChild(btn);
+      });
+      elProgress.style.width = `${(round.idx/round.qs.length)*100}%`;
+      enablePowers();
+    };
+
+    const choose = (ans) => {
+      if (!round) return; stopTimer();
+      const q = round.qs[round.idx];
+      const correct = ans === q.correct;
+      const buttons = [...elAnswers.querySelectorAll('button')];
+      buttons.forEach(b => b.disabled = true);
+      if (correct) {
+        round.correct++;
+        AudioFX.play('correct'); Haptics.strong(); Bees.converge();
+      } else {
+        AudioFX.play('wrong'); Haptics.medium(); Bees.disperse();
+      }
+      buttons.forEach(b => {
+        const isCorrect = b.getAttribute('data-ans') === q.correct;
+        b.classList.add(isCorrect ? 'bg-emerald-600/80' : (b.getAttribute('data-ans')===ans ? 'bg-rose-600/60' : 'opacity-60'));
+      });
+      gsap.fromTo(document.getElementById('question-card'), { scale: .985 }, { scale: 1, duration: .2, ease: 'power2.out' });
+
+      // Rewards per question
+      const xpGain = correct ? 10 : 2; const coinGain = correct ? 2 : 0;
+      Store.patch(s => { s.xp += xpGain; s.coins += coinGain; s.correctStreak = correct ? (s.correctStreak+1) : 0; });
+      elXPTicker.textContent = `+${xpGain} XP`; elCoinTicker.textContent = `+${coinGain}`;
+      Achievements.notify({ type: 'answer', correct, timeMs: round.totalTimeMs - round.timeLeftMs });
+      updateHeader();
+
+      setTimeout(next, 600);
+    };
+
+    const next = () => {
+      if (!round) return;
+      if (round.idx < round.qs.length - 1) {
+        round.idx++; round.totalTimeMs = 20000; round.startedAt = Date.now(); render(); startTimer();
+      } else {
+        endRound();
+      }
+    };
+
+    const endRound = () => {
+      if (!round) return; const total = round.qs.length; const correctCount = round.correct; const accuracy = Math.round((correctCount/total)*100);
+      const timeBonus = Math.max(0, Math.round((round.qs.length*20_000 - (Date.now() - round.startedAt))/1000));
+      const coinBonus = Math.round(correctCount * 1.5);
+      Store.patch(s => { s.coins += coinBonus; }); updateHeader();
+      Achievements.notify({ type: 'round_end', correctCount, total, correctRate: correctCount/total, category: round.qs[0]?.category });
+      if (round.daily) { Achievements.notify({ type: 'daily_win' }); Store.patch(s => { s.daily.playedToday = true; s.coins += 50; s.xp += 80; }); Ui.toast('Daily reward: +50 coins +80 XP', 'success'); }
+      const m = Ui.modal(`
+        <div class="flex items-center gap-2 mb-2"><svg class="w-6 h-6 text-amber-300"><use href="#icon-trophy"/></svg><h3 class="text-xl font-semibold">Round Complete</h3></div>
+        <p class="text-slate-300 mb-2">Score: <b>${correctCount}/${total}</b> • Accuracy: <b>${accuracy}%</b></p>
+        <p class="text-slate-300 mb-4">Time Bonus: <b>${timeBonus}</b> • Coins: <b>+${coinBonus}</b></p>
+        <div class="grid grid-cols-3 gap-2">
+          <button id="btn-replay" class="pressable ripple px-3 py-2 rounded-xl bg-brand-600 text-white">Replay</button>
+          <button id="btn-change" class="pressable ripple px-3 py-2 rounded-xl bg-slate-800/70">Change</button>
+          <button id="btn-home" class="pressable ripple px-3 py-2 rounded-xl bg-slate-800/70">Home</button>
+        </div>
+      `);
+      document.getElementById('btn-replay').addEventListener('click', () => { m.close(); startRound(currentPlayOptions()); });
+      document.getElementById('btn-change').addEventListener('click', () => { m.close(); Router.show('play'); });
+      document.getElementById('btn-home').addEventListener('click', () => { m.close(); Router.show('home'); });
+      Ui.confetti(200); AudioFX.play('levelup'); Haptics.strong();
+      round = null;
+    };
+
+    const currentPlayOptions = () => {
+      const amount = Number(document.getElementById('amount-select').value);
+      const difficulty = document.getElementById('difficulty-select').value;
+      const type = document.getElementById('type-select').value;
+      const catEl = document.querySelector('#category-chips .chip.active');
+      const category = catEl ? Number(catEl.getAttribute('data-id')) : undefined;
+      return { amount, difficulty, type, category };
+    };
+
+    // Power-ups
+    power5050.addEventListener('click', () => {
+      const s = Store.get(); if (s.inventory.fifty <= 0 || !round) return; AudioFX.play('tap'); Haptics.tap();
+      Store.patch(st => { st.inventory.fifty--; }); enablePowers();
+      const q = round.qs[round.idx]; const buttons = [...elAnswers.querySelectorAll('button')];
+      const wrong = buttons.filter(b => b.getAttribute('data-ans') !== q.correct);
+      Utils.shuffle(wrong).slice(0, Math.floor(wrong.length/2)).forEach(b => { b.disabled = true; b.classList.add('opacity-40'); });
+      Achievements.notify({ type: 'power', countUsed: ++round.used.fifty });
+      spark();
+    });
+
+    powerTime.addEventListener('click', () => {
+      const s = Store.get(); if (s.inventory.addTime <= 0 || !round) return; AudioFX.play('tap'); Haptics.tap();
+      Store.patch(st => { st.inventory.addTime--; }); enablePowers();
+      round.totalTimeMs += 7000; spark(); Achievements.notify({ type: 'power', countUsed: ++round.used.time });
+    });
+
+    powerSkip.addEventListener('click', () => {
+      const s = Store.get(); if (s.inventory.skip <= 0 || !round) return; AudioFX.play('tap'); Haptics.tap();
+      Store.patch(st => { st.inventory.skip--; }); enablePowers();
+      Achievements.notify({ type: 'power', countUsed: ++round.used.skip });
+      next(); spark();
+    });
+
+    const spark = () => {
+      const card = document.getElementById('question-card');
+      const el = document.createElement('div'); el.className = 'pointer-events-none absolute'; card.appendChild(el);
+      const lines = Array.from({ length: 10 }, () => {
+        const d = document.createElement('div'); d.style.position='absolute'; d.style.width='2px'; d.style.height='10px'; d.style.background='linear-gradient(#fff, transparent)'; d.style.left='50%'; d.style.top='50%'; d.style.transformOrigin='bottom center'; el.appendChild(d); return d;
+      });
+      gsap.fromTo(lines, { rotation: () => Math.random()*360, y: 0, opacity: 1 }, { y: -30, opacity: 0, duration: .5, stagger: .02, ease: 'power2.out', onComplete: () => el.remove() });
+    };
+
+    // PTR
+    const ptr = (() => {
+      const el = document.getElementById('ptr-indicator'); let startY = null; let pulled = 0; const threshold = 52;
+      const onStart = (e) => { if (window.scrollY > 8) return; startY = e.touches ? e.touches[0].clientY : e.clientY; pulled = 0; };
+      const onMove = (e) => { if (startY == null) return; const y = e.touches ? e.touches[0].clientY : e.clientY; pulled = Math.max(0, y - startY); el.style.transform = `translateY(${pulled}px)`; el.textContent = pulled>threshold?'Release to refresh':'↓ Pull to refresh'; };
+      const onEnd = () => { el.style.transform = 'translateY(0)'; if (pulled>threshold) { AudioFX.play('tap'); Haptics.medium(); loadNew(); } startY=null; pulled=0; };
+      const loadNew = () => startRound(currentPlayOptions());
+      const host = document.getElementById('screen-play');
+      host.addEventListener('touchstart', onStart, { passive: true });
+      host.addEventListener('touchmove', onMove, { passive: true });
+      host.addEventListener('touchend', onEnd, { passive: true });
+      return { loadNew };
+    })();
+
+    return { startRound, currentPlayOptions };
+  })();
+
+  // ===============================
+  // Daily Challenge & Streaks
+  // ===============================
+  const Daily = (() => {
+    const streakLabel = document.getElementById('streak-label');
+    const streakRing = document.getElementById('streak-ring');
+    const dailyBtn = document.getElementById('daily-challenge-btn');
+    const startDailyBtn = document.getElementById('start-daily-btn');
+
+    const ringLen = 2 * Math.PI * 40; // r=40
+
+    const updateDay = () => {
+      const s = Store.get();
+      const today = new Date().toDateString();
+      let streakDays = s.daily.streakDays || 0;
+      if (s.daily.lastDate !== today) {
+        const last = s.daily.lastDate ? new Date(s.daily.lastDate) : null;
+        const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+        if (!s.daily.lastDate || last?.toDateString() === yesterday.toDateString()) streakDays++; else streakDays = 1;
+        Store.patch(st => { st.daily.lastDate = today; st.daily.streakDays = streakDays; st.daily.playedToday = false; });
+      }
+      streakLabel.textContent = `${streakDays||0} day${(streakDays||0)===1?'':'s'}`;
+      const ratio = Math.min(1, (streakDays % 7) / 7); streakRing.style.strokeDasharray = String(ringLen); streakRing.style.strokeDashoffset = String((1 - ratio) * ringLen);
+    };
+
+    const seedForToday = () => {
+      const d = new Date(); const str = `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; return str;
+    };
+
+    const launch = () => {
+      const s = Store.get(); if (s.daily.playedToday) { Ui.toast('Already played today'); return; }
+      const seed = seedForToday();
+      Router.show('play');
+      Game.startRound({ ...Game.currentPlayOptions(), amount: 10, seed, daily: true });
+      Store.patch(st => { st.daily.playedToday = true; });
+    };
+
+    dailyBtn.addEventListener('click', () => { Haptics.tap(); AudioFX.play('tap'); launch(); });
+    startDailyBtn.addEventListener('click', () => { Haptics.tap(); AudioFX.play('tap'); launch(); });
+
+    return { updateDay, seedForToday };
+  })();
+
+  // ===============================
+  // Store UI
+  // ===============================
+  const StoreUI = (() => {
+    const packsEl = document.getElementById('store-packs');
+    const inventoryEl = document.getElementById('inventory');
+    const packs = [
+      { id: 'coins-50', name: '+50 Coins', price: 40, coins: 50 },
+      { id: 'coins-150', name: '+150 Coins', price: 120, coins: 150 },
+      { id: 'fifty-1', name: '50/50 x1', price: 30, item: 'fifty' },
+      { id: 'time-1', name: 'Add Time x1', price: 30, item: 'addTime' },
+      { id: 'skip-1', name: 'Skip x1', price: 30, item: 'skip' },
+      { id: 'freeze-1', name: 'Streak Freeze', price: 80, item: 'streakFreeze' }
+    ];
+
+    const renderPacks = () => {
+      packsEl.innerHTML = '';
+      packs.forEach(p => {
+        const card = document.createElement('button');
+        card.className = 'pressable ripple glass-soft rounded-2xl p-3 text-left';
+        card.innerHTML = `<div class="text-sm font-medium">${p.name}</div><div class="text-xs text-slate-300">Price: ${p.price} <svg class=\"inline w-4 h-4 text-amber-300 align-[-2px]\"><use href=\"#icon-coin\"/></svg></div>`;
+        card.addEventListener('click', () => buy(p));
+        packsEl.appendChild(card);
+      });
+    };
+
+    const buy = (p) => {
+      const s = Store.get(); if (s.coins < p.price) { Ui.toast('Not enough coins', 'error'); AudioFX.play('wrong'); return; }
+      Store.patch(st => { st.coins -= p.price; if (p.coins) st.coins += p.coins; if (p.item) st.inventory[p.item] = (st.inventory[p.item]||0)+1; });
+      Ui.toast('Purchased!', 'success'); AudioFX.play('tap'); Haptics.tap(); updateHeader(); renderInventory();
+    };
+
+    const renderInventory = () => {
+      const s = Store.get();
+      const items = [ ['50/50','fifty'], ['Add Time','addTime'], ['Skip','skip'], ['Streak Freeze','streakFreeze'] ];
+      inventoryEl.innerHTML = '';
+      items.forEach(([name, key]) => {
+        const qty = s.inventory[key]||0; const el = document.createElement('div');
+        el.className = 'glass-soft rounded-xl p-3 flex items-center justify-between';
+        el.innerHTML = `<span>${name}</span><span class="text-sm text-slate-300">x${qty}</span>`;
+        inventoryEl.appendChild(el);
+      });
+    };
+
+    return { renderPacks, renderInventory };
+  })();
+
+  // ===============================
+  // Settings UI
+  // ===============================
+  const SettingsUI = (() => {
+    const sound = document.getElementById('toggle-sound');
+    const haptics = document.getElementById('toggle-haptics');
+    const anim = document.getElementById('select-anim');
+    const font = document.getElementById('select-font');
+    const resetBtn = document.getElementById('btn-reset');
+
+    const load = () => {
+      const s = Store.get(); sound.checked = !!s.settings.sound; haptics.checked = !!s.settings.haptics; anim.value = s.settings.anim || 'Med'; font.value = s.settings.font || 'Medium';
+      document.documentElement.style.fontSize = font.value==='Large'?'18px':font.value==='Small'?'14px':'16px';
+    };
+    const save = () => Store.patch(st => { st.settings.sound = sound.checked; st.settings.haptics = haptics.checked; st.settings.anim = anim.value; st.settings.font = font.value; });
+
+    sound.addEventListener('change', () => { save(); AudioFX.play('tap'); });
+    haptics.addEventListener('change', () => { save(); Haptics.tap(); });
+    anim.addEventListener('change', () => { save(); Ui.toast('Animation updated'); });
+    font.addEventListener('change', () => { save(); load(); Ui.toast('Font size updated'); });
+
+    resetBtn.addEventListener('click', () => {
+      const m = Ui.modal(`<p class="mb-3">Reset all progress? This cannot be undone.</p><div class="flex gap-2 justify-end"><button id="cancel-reset" class="px-3 py-2 rounded-xl bg-slate-800/70">Cancel</button><button id="confirm-reset" class="px-3 py-2 rounded-xl bg-rose-600/80 text-white">Confirm</button></div>`);
+      document.getElementById('cancel-reset').addEventListener('click', () => m.close());
+      document.getElementById('confirm-reset').addEventListener('click', () => { Store.reset(); load(); updateHeader(); Ui.toast('Data reset','success'); m.close(); });
+    });
+
+    return { load };
+  })();
+
+  // ===============================
+  // Achievements UI
+  // ===============================
+  const AchievementsUI = (() => {
+    const grid = document.getElementById('achievements-grid');
+    const recentStrip = document.getElementById('recent-achievements');
+    const render = () => {
+      const s = Store.get();
+      const list = Achievements.list();
+      grid.innerHTML = '';
+      list.forEach(a => {
+        const locked = !s.achievements.unlocked.includes(a.id);
+        const el = document.createElement('button');
+        el.className = `pressable ripple rounded-2xl p-3 text-left ${locked?'bg-slate-800/60':'glass-soft'}`;
+        el.innerHTML = `<div class="flex items-center gap-2 mb-1"><svg class="w-5 h-5 ${locked?'text-slate-500':'text-amber-300'}"><use href="#icon-${a.icon}"/></svg><span class="font-medium">${a.name}</span></div><div class="text-xs text-slate-300">${a.desc}</div>`;
+        el.addEventListener('click', () => { if (!locked) Achievements.claim(a.id); else Ui.toast('Locked'); });
+        grid.appendChild(el);
+      });
+      // Recent strip
+      recentStrip.innerHTML='';
+      s.achievements.unlocked.slice(-10).forEach(id => {
+        const a = Achievements.list().find(x => x.id===id); if (!a) return; const chip = document.createElement('div'); chip.className = 'glass-soft rounded-xl px-2 py-1 text-xs flex items-center gap-1'; chip.innerHTML = `<svg class="w-4 h-4 text-amber-300"><use href="#icon-${a.icon}"/></svg><span>${a.name}</span>`; recentStrip.appendChild(chip);
+      });
+    };
+    return { render };
+  })();
+
+  // ===============================
+  // Onboarding Tour
+  // ===============================
+  const Onboarding = (() => {
+    const key = 'quizbee:onboarding:v1';
+    const steps = [
+      { sel: '[data-route="/play"]', title: 'Play', text: 'Start a round and climb your streak!' },
+      { sel: '#question-card', title: 'Power-ups', text: 'Use 50/50, Add Time, or Skip to strategize.' },
+      { sel: '[data-route="/achievements"]', title: 'Achievements', text: 'Unlock badges and claim coin rewards.' },
+      { sel: '[data-route="/store"]', title: 'Store', text: 'Buy power-ups and coin packs with coins.' }
+    ];
+    const start = () => {
+      if (localStorage.getItem(key)) return;
+      let idx = 0; const overlay = document.createElement('div'); overlay.className = 'fixed inset-0 z-50'; document.body.appendChild(overlay);
+      const frame = () => {
+        const s = steps[idx]; if (!s) { overlay.remove(); localStorage.setItem(key, '1'); Ui.toast('Welcome to QuizBee!','success'); return; }
+        const rect = document.querySelector(s.sel).getBoundingClientRect();
+        overlay.innerHTML = `<div class="absolute inset-0 bg-black/60"></div><div class="absolute" style="left:${Math.max(12,rect.left)}px;top:${Math.max(12, rect.top-8)}px;right:${12}px"><div class="glass rounded-2xl p-4 shadow-soft max-w-sm"><div class="font-semibold mb-1">${s.title}</div><div class="text-sm text-slate-300">${s.text}</div><div class="flex items-center gap-2 mt-3 justify-end"><button id="skip" class="px-3 py-1 rounded-xl bg-slate-800/70">Skip</button><button id="next" class="px-3 py-1 rounded-xl bg-brand-600 text-white">Next</button></div><div class="mt-2 text-right text-xs text-slate-400">${idx+1}/${steps.length}</div></div></div>`;
+        overlay.querySelector('#next').onclick = () => { idx++; frame(); };
+        overlay.querySelector('#skip').onclick = () => { overlay.remove(); localStorage.setItem(key, '1'); };
+      };
+      frame();
+    };
+    return { start };
+  })();
+
+  // ===============================
+  // Online/Offline handling
+  // ===============================
+  const Net = (() => {
+    const syncRewards = () => {
+      const s = Store.get(); if (!navigator.onLine) return; if (!s.rewardQueue || !s.rewardQueue.length) return; // dummy sync
+      Store.patch(st => { st.rewardQueue = []; });
+      Ui.toast('Synced rewards', 'success');
+    };
+    window.addEventListener('online', () => { Ui.toast('Back online','success'); syncRewards(); });
+    window.addEventListener('offline', () => { Ui.toast('Offline: Practice Mode'); });
+    return { syncRewards };
+  })();
+
+  // ===============================
+  // Header update helper
+  // ===============================
+  function updateHeader() {
+    const s = Store.get(); document.getElementById('coins-label').textContent = s.coins; document.getElementById('xp-label').textContent = s.xp;
+  }
+
+  // ===============================
+  // Category chips
+  // ===============================
+  async function renderCategories() {
+    const host = document.getElementById('category-chips');
+    host.innerHTML = '';
+    const cats = await Api.categories();
+    const all = [{ id: '', name: 'All' }, ...cats];
+    all.forEach(c => {
+      const chip = document.createElement('button'); chip.className = 'chip pressable ripple px-3 py-1.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 text-sm'; chip.textContent = c.name; chip.setAttribute('data-id', c.id);
+      chip.addEventListener('click', () => { host.querySelectorAll('.chip').forEach(x => x.classList.remove('active', 'bg-brand-600')); chip.classList.add('active', 'bg-brand-600'); AudioFX.play('tap'); Haptics.tap(); });
+      if (c.id==='') chip.classList.add('active', 'bg-brand-600');
+      host.appendChild(chip);
+    });
+  }
+
+  // ===============================
+  // Event bindings (Home/Play)
+  // ===============================
+  document.getElementById('quick-start-btn').addEventListener('click', () => { AudioFX.play('tap'); Haptics.tap(); Router.show('play'); Game.startRound(Game.currentPlayOptions()); });
+  document.getElementById('reload-btn').addEventListener('click', () => { AudioFX.play('tap'); Haptics.tap(); Game.startRound(Game.currentPlayOptions()); });
+
+  // ===============================
+  // Init
+  // ===============================
+  function init() {
+    // Prepare store and baseline UI
+    Store.get(); updateHeader();
+
+    // Bees
+    Bees.spawn(8);
+
+    // UI helpers
+    Ui.addRipples();
+
+    // Router
+    Router.init();
+
+    // Home/day updates
+    Daily.updateDay();
+
+    // Render categories
+    renderCategories();
+
+    // Store
+    StoreUI.renderPacks(); StoreUI.renderInventory();
+
+    // Settings
+    SettingsUI.load();
+
+    // Achievements UI
+    AchievementsUI.render();
+
+    // Onboarding
+    setTimeout(() => Onboarding.start(), 600);
+  }
+
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { Daily.updateDay(); } });
+  window.addEventListener('load', init);
+
+  </script>
+</body>
+</html>
