@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>QuizBee</title>
+  <meta name="description" content="QuizBee - Premium HTML quiz app with gamified progression" />
+  <meta name="theme-color" content="#0ea5e9" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: ['class', '[data-theme="dark"]'],
+      theme: {
+        extend: {
+          colors: {
+            accent: {
+              DEFAULT: '#0ea5e9',
+              soft: '#38bdf8'
+            },
+            surface: 'rgba(255,255,255,0.12)',
+            card: 'rgba(255,255,255,0.14)',
+            borderSoft: 'rgba(255,255,255,0.18)'
+          },
+          boxShadow: {
+            glass: '0 10px 30px rgba(0,0,0,0.18)',
+            soft: '0 6px 16px rgba(0,0,0,0.12)'
+          },
+          backdropBlur: {
+            xs: '2px'
+          },
+          keyframes: {
+            shimmer: {
+              '0%': { backgroundPosition: '-200% 0' },
+              '100%': { backgroundPosition: '200% 0' }
+            },
+            pop: {
+              '0%': { transform: 'scale(0.98)' },
+              '100%': { transform: 'scale(1)' }
+            },
+            shake: {
+              '10%, 90%': { transform: 'translateX(-1px)' },
+              '20%, 80%': { transform: 'translateX(2px)' },
+              '30%, 50%, 70%': { transform: 'translateX(-4px)' },
+              '40%, 60%': { transform: 'translateX(4px)' }
+            },
+            fadeSlideIn: {
+              '0%': { opacity: 0, transform: 'translateY(8px)' },
+              '100%': { opacity: 1, transform: 'translateY(0)' }
+            },
+            pulseSoft: {
+              '0%, 100%': { transform: 'scale(1)' },
+              '50%': { transform: 'scale(1.03)' }
+            },
+            grain: {
+              '0%': { transform: 'translate(0,0)' },
+              '10%': { transform: 'translate(-1%, -1%)' },
+              '20%': { transform: 'translate(1%, -1%)' },
+              '30%': { transform: 'translate(-2%, 1%)' },
+              '40%': { transform: 'translate(3%, 2%)' },
+              '50%': { transform: 'translate(2%, 3%)' },
+              '60%': { transform: 'translate(-3%, 2%)' },
+              '70%': { transform: 'translate(2%, -3%)' },
+              '80%': { transform: 'translate(-1%, 2%)' },
+              '90%': { transform: 'translate(1%, 0)' },
+              '100%': { transform: 'translate(0,0)' }
+            }
+          },
+          animation: {
+            shimmer: 'shimmer 2.5s linear infinite',
+            pop: 'pop 180ms ease-out',
+            shake: 'shake 380ms cubic-bezier(.36,.07,.19,.97) both',
+            fadeSlideIn: 'fadeSlideIn 220ms ease-out',
+            pulseSoft: 'pulseSoft 2.2s ease-in-out infinite',
+            grain: 'grain 9s steps(10) infinite'
+          }
+        }
+      }
+    }
+  </script>
+  <!-- GSAP CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" integrity="sha512-+7n3Fz8j+uC2O9H2bW+0kQcQ9x0TqGmQ9JQ+S+vkZJ2q/8sJfG9H7Z4m/6Q+o6QmXyGgJd1f3f2o3l3J1m4wHg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/MotionPathPlugin.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    :root {
+      --bg-start: #0b1220;
+      --bg-end: #0f172a;
+      --accent: #0ea5e9;
+      --glass: rgba(255,255,255,0.08);
+      --glass-strong: rgba(255,255,255,0.16);
+      --ring: rgba(14,165,233,0.45);
+    }
+    html, body { height: 100%; }
+    body {
+      background: radial-gradient(1200px 800px at 20% 10%, rgba(14,165,233,0.09), transparent 40%),
+                  radial-gradient(1200px 800px at 80% 90%, rgba(168,85,247,0.06), transparent 40%),
+                  linear-gradient(160deg, var(--bg-start), var(--bg-end));
+      color: #e5e7eb;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .glass {
+      background: var(--glass);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
+      backdrop-filter: blur(10px);
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.04));
+      border: 1px solid rgba(255,255,255,0.14);
+      box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+      backdrop-filter: blur(12px);
+    }
+    .noise::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.035"/></svg>');
+      mix-blend-mode: overlay;
+      animation: grain 12s steps(10) infinite;
+    }
+    .shimmer-text {
+      background: linear-gradient(90deg, rgba(255,255,255,0.3), rgba(255,255,255,0.95), rgba(255,255,255,0.3));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      background-size: 200% 100%;
+      animation: shimmer 3.2s linear infinite;
+    }
+    .btn { transition: transform 120ms ease, background-color 120ms ease, box-shadow 120ms ease; }
+    .btn:active { transform: scale(0.98); }
+    .focus-ring:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 0.75rem; }
+    .ripple { position: relative; overflow: hidden; }
+    .ripple::after { content: ""; position: absolute; inset: 0; border-radius: inherit; transform: scale(0); opacity: 0.35; background: radial-gradient(circle, rgba(255,255,255,0.45) 10%, transparent 11%) center/10px 10px no-repeat; transition: transform 450ms ease, opacity 600ms ease; }
+    .ripple:active::after { transform: scale(18); opacity: 0; }
+    .bees-layer { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+    .app-wrap { position: relative; z-index: 2; }
+    .nav { position: fixed; bottom: env(safe-area-inset-bottom); left: 0; right: 0; z-index: 50; }
+    .sr-only-important { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+  </style>
+</head>
+<body class="noise min-h-screen font-sans selection:bg-accent/30 selection:text-white">
+  <!-- SVG Icon Sprite -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="i-home" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24"><path fill="currentColor" d="M5 3h14v3h2v3a5 5 0 0 1-4 4.9V16a2 2 0 0 1-2 2h-2v2h4v2H7v-2h4v-2H9a2 2 0 0 1-2-2v-2.1A5 5 0 0 1 3 9V6h2zM5 9a3 3 0 0 0 3 3V6H5zm11 3a3 3 0 0 0 3-3V6h-3z"/></symbol>
+    <symbol id="i-store" viewBox="0 0 24 24"><path fill="currentColor" d="M3 9h18l-2-5H5zM4 10h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 12.94a7.96 7.96 0 0 0 .06-.94 7.96 7.96 0 0 0-.06-.94l2.1-1.64-2-3.46-2.48.5a8.09 8.09 0 0 0-1.63-.94L12 2l-1.39 2.52c-.57.22-1.12.53-1.63.94l-2.48-.5-2 3.46L6.6 11.06c-.04.31-.06.62-.06.94s.02.63.06.94l-2.1 1.64 2 3.46 2.48-.5c.51.41 1.06.72 1.63.94L12 22l1.39-2.52c.57-.22 1.12-.53 1.63-.94l2.48.5 2-3.46zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></symbol>
+    <symbol id="i-sound" viewBox="0 0 24 24"><path fill="currentColor" d="M4 9v6h4l5 4V5L8 9zm10.54 1.46a3 3 0 0 1 0 2.12l1.42 1.42a5 5 0 0 0 0-7.07zM17.66 4.93 16.24 6.34a7 7 0 0 1 0 9.9l1.42 1.41a9 9 0 0 0 0-12.73z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></symbol>
+    <symbol id="i-lightning" viewBox="0 0 24 24"><path fill="currentColor" d="M11 21h-1l1-7H6l7-11h1l-1 7h5z"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path fill="currentColor" d="M12.1 21.35 10 19.28C5.4 14.36 2 11.28 2 7.5A4.5 4.5 0 0 1 6.5 3 5.5 5.5 0 0 1 12 6.09 5.5 5.5 0 0 1 17.5 3 4.5 4.5 0 0 1 22 7.5c0 3.78-3.4 6.86-8 11.78z"/></symbol>
+    <symbol id="i-coin" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 5.13 2 9s4.48 7 10 7 10-3.13 10-7-4.48-7-10-7zm0 12c-4.42 0-8-2.24-8-5s3.58-5 8-5 8 2.24 8 5-3.58 5-8 5z"/></symbol>
+    <symbol id="i-crown" viewBox="0 0 24 24"><path fill="currentColor" d="M2 7l5 4 5-6 5 6 5-4-3 12H5z"/></symbol>
+    <symbol id="i-reload" viewBox="0 0 24 24"><path fill="currentColor" d="M12 6V3L8 7l4 4V8a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></symbol>
+  </svg>
+
+  <!-- Bees Background Layer -->
+  <div id="bees" class="bees-layer"></div>
+
+  <div id="app" class="app-wrap min-h-screen pb-28">
+    <!-- Header -->
+    <header class="px-5 pt-6 pb-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl glass grid place-items-center text-accent shadow-glass">
+          <svg width="22" height="22" aria-hidden="true"><use href="#i-crown"/></svg>
+        </div>
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight shimmer-text">QuizBee</h1>
+          <p class="text-xs text-white/60 -mt-1">Fast. Polished. Fun.</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <div id="xpBadge" class="px-3 py-1.5 rounded-xl glass text-xs flex items-center gap-1.5"><svg width="16" height="16"><use href="#i-star"/></svg><span id="xpText">Lv 1 · 0 XP</span></div>
+        <div id="coinBadge" class="px-3 py-1.5 rounded-xl glass text-xs flex items-center gap-1.5"><svg width="16" height="16" class="text-yellow-300"><use href="#i-coin"/></svg><span id="coinText">0</span></div>
+      </div>
+    </header>
+
+    <!-- Router Views -->
+    <main id="views" class="px-5 space-y-6">
+      <!-- Home View -->
+      <section data-route="home" class="route">
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div class="card rounded-2xl p-5">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold tracking-tight">Daily Streak</h2>
+              <div class="text-sm text-white/60" id="streakText">0 days</div>
+            </div>
+            <div class="mt-4 flex items-center gap-4">
+              <svg width="80" height="80" viewBox="0 0 120 120" class="text-accent">
+                <circle cx="60" cy="60" r="46" stroke="white" stroke-opacity="0.1" stroke-width="12" fill="none"/>
+                <circle id="streakRing" cx="60" cy="60" r="46" stroke="currentColor" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="289"/>
+              </svg>
+              <div>
+                <div class="text-2xl font-bold" id="streakHeadline">0-day streak</div>
+                <div class="text-sm text-white/60">Keep it up for bonus rewards</div>
+              </div>
+            </div>
+          </div>
+          <div class="card rounded-2xl p-5">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold tracking-tight">Daily Challenge</h2>
+              <span id="dailyStatus" class="text-xs px-2 py-1 rounded-lg bg-white/10">Available</span>
+            </div>
+            <p class="mt-2 text-white/70">10 curated questions. Single try. Boosted rewards.</p>
+            <div class="mt-4 flex gap-3">
+              <button id="btnDaily" class="btn ripple focus-ring px-4 py-2 rounded-xl bg-accent text-white shadow-soft">Play now</button>
+              <button id="btnQuickStart" class="btn ripple focus-ring px-4 py-2 rounded-xl bg-white/10">Quick Start</button>
+            </div>
+            <div class="mt-4 text-xs text-white/50" id="recentAch">Recent achievements appear here.</div>
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-4">
+          <div class="card rounded-2xl p-5">
+            <h3 class="font-semibold">Tips</h3>
+            <p class="text-sm text-white/70 mt-2">Use power-ups wisely. Keep your streak for extra XP and coins.</p>
+          </div>
+          <div class="card rounded-2xl p-5">
+            <h3 class="font-semibold">Practice Mode</h3>
+            <p class="text-sm text-white/70 mt-2">No internet? Practice with cached questions and still earn XP.</p>
+          </div>
+          <div class="card rounded-2xl p-5">
+            <h3 class="font-semibold">Premium feel</h3>
+            <p class="text-sm text-white/70 mt-2">Glassy UI, buttery animations, and satisfying feedback.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Play View -->
+      <section data-route="play" class="route hidden">
+        <div class="card rounded-2xl p-4">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex gap-2 overflow-x-auto no-scrollbar" id="categoryChips" aria-label="Categories"></div>
+            <div class="flex items-center gap-2">
+              <select id="difficulty" class="bg-white/10 rounded-xl px-3 py-2">
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+              <select id="amount" class="bg-white/10 rounded-xl px-3 py-2">
+                <option>5</option>
+                <option selected>10</option>
+                <option>15</option>
+              </select>
+              <select id="type" class="bg-white/10 rounded-xl px-3 py-2">
+                <option value="multiple">Multiple</option>
+                <option value="boolean">True/False</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card rounded-2xl p-4 mt-4" id="questionCard" aria-live="polite">
+          <div class="flex items-center justify-between">
+            <div id="qCounter" class="text-sm text-white/70">Q 0/0</div>
+            <div class="flex items-center gap-2">
+              <div class="flex items-center gap-1 text-yellow-300 text-sm"><svg width="16" height="16"><use href="#i-coin"/></svg><span id="roundCoins">0</span></div>
+              <div class="flex items-center gap-1 text-accent text-sm"><svg width="16" height="16"><use href="#i-star"/></svg><span id="roundXP">0</span></div>
+            </div>
+          </div>
+          <div class="mt-3 flex items-center gap-3">
+            <svg width="54" height="54" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" stroke="white" stroke-opacity="0.1" stroke-width="12" fill="none"/>
+              <circle id="timerRing" cx="60" cy="60" r="50" stroke="currentColor" class="text-accent" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="0"/>
+            </svg>
+            <div class="flex-1">
+              <div id="questionText" class="text-lg font-medium"></div>
+            </div>
+          </div>
+          <div id="answers" class="mt-4 grid gap-2"></div>
+          <div class="mt-4 h-2 bg-white/10 rounded-full overflow-hidden">
+            <div id="progressBar" class="h-full bg-accent rounded-full w-0"></div>
+          </div>
+          <div class="mt-4 flex gap-2">
+            <button id="p5050" class="btn ripple focus-ring px-3 py-2 rounded-xl bg-white/10 flex items-center gap-1 disabled:opacity-40"><svg width="18" height="18"><use href="#i-lightning"/></svg> 50/50</button>
+            <button id="pTime" class="btn ripple focus-ring px-3 py-2 rounded-xl bg-white/10 flex items-center gap-1 disabled:opacity-40"><svg width="18" height="18"><use href="#i-reload"/></svg> +10s</button>
+            <button id="pSkip" class="btn ripple focus-ring px-3 py-2 rounded-xl bg-white/10 flex items-center gap-1 disabled:opacity-40"><svg width="18" height="18"><use href="#i-play"/></svg> Skip</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Achievements View -->
+      <section data-route="achievements" class="route hidden">
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4" id="achGrid"></div>
+      </section>
+
+      <!-- Store View -->
+      <section data-route="store" class="route hidden">
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="card rounded-2xl p-5">
+            <h3 class="font-semibold">Coin Packs</h3>
+            <div class="mt-3 grid grid-cols-2 gap-3" id="coinPacks"></div>
+          </div>
+          <div class="card rounded-2xl p-5">
+            <h3 class="font-semibold">Power-ups</h3>
+            <div class="mt-3 grid grid-cols-2 gap-3" id="powerUps"></div>
+          </div>
+        </div>
+        <div class="card rounded-2xl p-5 mt-4">
+          <h3 class="font-semibold">Inventory</h3>
+          <div class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3" id="inventory"></div>
+        </div>
+      </section>
+
+      <!-- Settings View -->
+      <section data-route="settings" class="route hidden">
+        <div class="card rounded-2xl p-5">
+          <h3 class="font-semibold">Preferences</h3>
+          <div class="mt-4 grid sm:grid-cols-2 gap-4">
+            <label class="flex items-center justify-between bg-white/5 rounded-xl p-3">
+              <span class="flex items-center gap-2"><svg width="18" height="18"><use href="#i-sound"/></svg> Sound</span>
+              <input id="toggleSound" type="checkbox" class="accent-accent" checked />
+            </label>
+            <label class="flex items-center justify-between bg-white/5 rounded-xl p-3">
+              <span class="flex items-center gap-2"><svg width="18" height="18"><use href="#i-lightning"/></svg> Haptics</span>
+              <input id="toggleHaptics" type="checkbox" class="accent-accent" checked />
+            </label>
+            <label class="flex items-center justify-between bg-white/5 rounded-xl p-3">
+              <span>Animation</span>
+              <select id="animLevel" class="bg-white/10 rounded-lg px-3 py-2">
+                <option>Low</option>
+                <option selected>Med</option>
+                <option>High</option>
+              </select>
+            </label>
+            <label class="flex items-center justify-between bg-white/5 rounded-xl p-3">
+              <span>Font size</span>
+              <select id="fontSize" class="bg-white/10 rounded-lg px-3 py-2">
+                <option>Normal</option>
+                <option>Large</option>
+                <option>XL</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="card rounded-2xl p-5 mt-4">
+          <h3 class="font-semibold">Data</h3>
+          <div class="mt-3 flex gap-3">
+            <button id="btnReset" class="btn ripple focus-ring px-4 py-2 rounded-xl bg-white/10">Reset Data</button>
+            <button id="btnAbout" class="btn ripple focus-ring px-4 py-2 rounded-xl bg-white/10">About</button>
+          </div>
+          <p class="text-xs text-white/50 mt-3">Local storage only. No personal data leaves your device.</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Nav -->
+    <nav class="nav px-4">
+      <div class="glass rounded-2xl p-2 grid grid-cols-5 gap-1 max-w-3xl mx-auto">
+        <button data-link="home" class="btn ripple focus-ring nav-btn px-3 py-2 rounded-xl flex flex-col items-center text-white/70 aria-selected:text-white aria-selected:bg-white/10" aria-selected="true" aria-label="Home"><svg width="22" height="22"><use href="#i-home"/></svg><span class="text-[10px] mt-1">Home</span></button>
+        <button data-link="play" class="btn ripple focus-ring nav-btn px-3 py-2 rounded-xl flex flex-col items-center text-white/70" aria-label="Play"><svg width="22" height="22"><use href="#i-play"/></svg><span class="text-[10px] mt-1">Play</span></button>
+        <button data-link="achievements" class="btn ripple focus-ring nav-btn px-3 py-2 rounded-xl flex flex-col items-center text-white/70" aria-label="Achievements"><svg width="22" height="22"><use href="#i-trophy"/></svg><span class="text-[10px] mt-1">Trophies</span></button>
+        <button data-link="store" class="btn ripple focus-ring nav-btn px-3 py-2 rounded-xl flex flex-col items-center text-white/70" aria-label="Store"><svg width="22" height="22"><use href="#i-store"/></svg><span class="text-[10px] mt-1">Store</span></button>
+        <button data-link="settings" class="btn ripple focus-ring nav-btn px-3 py-2 rounded-xl flex flex-col items-center text-white/70" aria-label="Settings"><svg width="22" height="22"><use href="#i-settings"/></svg><span class="text-[10px] mt-1">Settings</span></button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Toasts/Modals -->
+  <div id="toastWrap" class="fixed top-4 left-0 right-0 z-[60] pointer-events-none flex flex-col items-center gap-2"></div>
+  <div id="modalWrap" class="fixed inset-0 z-[70] hidden items-center justify-center">
+    <div class="absolute inset-0 bg-black/50"></div>
+    <div class="relative card rounded-2xl p-6 w-[92vw] max-w-md" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <!-- Onboarding -->
+  <div id="onboarding" class="fixed inset-0 z-[80] hidden">
+    <div class="absolute inset-0 bg-black/50"></div>
+    <div class="relative mx-auto mt-16 max-w-md card rounded-2xl p-5">
+      <h3 class="font-semibold" id="obTitle">Welcome to QuizBee</h3>
+      <p class="text-sm text-white/70 mt-2" id="obBody">Quick tour of the essentials.</p>
+      <div class="mt-4 flex items-center justify-between">
+        <button id="obSkip" class="btn ripple focus-ring px-4 py-2 rounded-xl bg-white/10">Skip</button>
+        <div class="flex gap-1" id="obDots"></div>
+        <button id="obNext" class="btn ripple focus-ring px-4 py-2 rounded-xl bg-accent text-white">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // Utils
+  const Utils = (() => {
+    const decodeHtml = (str) => {
+      const txt = document.createElement('textarea');
+      txt.innerHTML = str;
+      return txt.value;
+    };
+    const clamp = (n, a, b) => Math.min(Math.max(n, a), b);
+    const choice = (arr) => arr[Math.floor(Math.random()*arr.length)];
+    const formatTime = (ms) => {
+      const s = Math.ceil(ms/1000);
+      const m = Math.floor(s/60);
+      const r = s%60;
+      return m ? `${m}:${r.toString().padStart(2,'0')}` : `${r}s`;
+    };
+    const throttle = (fn, wait=200) => {
+      let t = 0; return (...args) => { const now = Date.now(); if (now - t >= wait) { t = now; fn(...args); } };
+    };
+    const debounce = (fn, wait=300) => {
+      let to; return (...args) => { clearTimeout(to); to = setTimeout(()=>fn(...args), wait); };
+    };
+    const seedPRNG = (seed) => {
+      let s = seed % 2147483647; if (s <= 0) s += 2147483646; return () => (s = s * 16807 % 2147483647) / 2147483647;
+    };
+    const todayKey = () => new Date().toISOString().slice(0,10);
+    return { decodeHtml, clamp, choice, formatTime, throttle, debounce, seedPRNG, todayKey };
+  })();
+
+  // Store with persistence
+  const Store = (() => {
+    const defaultState = {
+      xp: 0,
+      level: 1,
+      coins: 0,
+      streakDays: 0,
+      lastLogin: null,
+      bestStreak: 0,
+      lives: 5,
+      lastLifeTs: 0,
+      inventory: { p5050: 0, pTime: 0, pSkip: 0, streakFreeze: 0 },
+      settings: { sound: true, haptics: true, anim: 'Med', font: 'Normal' },
+      achievements: {},
+      cachedQuestions: [],
+      rewardsQueue: [],
+      daily: { lastKey: null, completed: false }
+    };
+    let state = { ...defaultState };
+    const load = () => {
+      try { const raw = localStorage.getItem('quizbee_state_v1'); if (raw) state = { ...defaultState, ...JSON.parse(raw) }; } catch {}
+      updateLoginStreak();
+      save();
+    };
+    const save = () => { try { localStorage.setItem('quizbee_state_v1', JSON.stringify(state)); } catch {} };
+    const updateLoginStreak = () => {
+      const today = Utils.todayKey();
+      if (state.lastLogin === today) return;
+      if (!state.lastLogin) { state.streakDays = 1; }
+      else {
+        const last = new Date(state.lastLogin);
+        const d = new Date(today);
+        const diff = Math.round((d - last)/(1000*60*60*24));
+        if (diff === 1) state.streakDays += 1; else if (diff > 1) state.streakDays = 1;
+      }
+      state.bestStreak = Math.max(state.bestStreak, state.streakDays);
+      state.lastLogin = today;
+    };
+    const addXP = (amount) => { state.xp += amount; const newLevel = 1 + Math.floor(state.xp/200); if (newLevel !== state.level) { state.level = newLevel; UI.toast(`Level up! Now Level ${state.level}`, 'success'); Audio.play('level'); Haptics.strong(); } save(); UI.updateHeader(); };
+    const addCoins = (amount) => { state.coins = Math.max(0, state.coins + amount); save(); UI.updateHeader(); };
+    const spendCoins = (amount) => { if (state.coins >= amount) { state.coins -= amount; save(); UI.updateHeader(); return true; } return false; };
+    const adjustInventory = (key, delta) => { state.inventory[key] = Math.max(0, (state.inventory[key]||0) + delta); save(); UI.renderInventory(); };
+    const setSetting = (k, v) => { state.settings[k] = v; save(); };
+    const setDaily = (obj) => { state.daily = { ...state.daily, ...obj }; save(); };
+    const cacheQuestions = (qs) => { state.cachedQuestions = qs.slice(0, 30); save(); };
+    const queueReward = (r) => { state.rewardsQueue.push(r); save(); };
+    const flushRewards = () => { state.rewardsQueue.forEach(r=>{ addXP(r.xp||0); addCoins(r.coins||0); }); state.rewardsQueue = []; save(); };
+    const reset = () => { state = { ...defaultState }; save(); };
+    const get = () => state;
+    load();
+    return { get, addXP, addCoins, spendCoins, adjustInventory, setSetting, setDaily, cacheQuestions, queueReward, flushRewards, reset };
+  })();
+
+  // Haptics
+  const Haptics = (() => {
+    const hasCap = () => !!window.Capacitor?.Haptics;
+    const impact = (style) => {
+      if (!Store.get().settings.haptics) return;
+      if (hasCap()) {
+        try { window.Capacitor.Haptics.impact({ style }); } catch {}
+      } else if (navigator.vibrate) {
+        navigator.vibrate(style === 'MEDIUM' ? 18 : style === 'HEAVY' ? 28 : 12);
+      }
+    };
+    return { light: ()=>impact('LIGHT'), medium: ()=>impact('MEDIUM'), strong: ()=>impact('HEAVY') };
+  })();
+
+  // Audio (WebAudio with base64 samples)
+  const Audio = (() => {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const samples = {
+      tap: 'UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAAA',
+      correct: 'UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAAA',
+      wrong: 'UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAAA',
+      level: 'UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAAA'
+    };
+    const buffers = {};
+    const decodeAll = async () => {
+      for (const k of Object.keys(samples)) {
+        const b64 = samples[k];
+        const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+        try { buffers[k] = await ctx.decodeAudioData(bin.slice(0)); } catch {}
+      }
+    };
+    const play = (key, opts={}) => {
+      if (!Store.get().settings.sound) return;
+      const buf = buffers[key]; if (!buf) return;
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const gain = ctx.createGain(); gain.gain.value = opts.gain ?? 0.3;
+      src.connect(gain).connect(ctx.destination);
+      src.start(0);
+    };
+    decodeAll();
+    return { play };
+  })();
+
+  // UI helpers
+  const UI = (() => {
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+
+    const toast = (msg, type='info', action) => {
+      const wrap = $('#toastWrap');
+      const div = document.createElement('div');
+      div.className = `pointer-events-auto card rounded-xl px-4 py-2 text-sm shadow-soft animate-fadeSlideIn ${type==='error'?'border-red-400/40 bg-red-400/10': type==='success'?'border-emerald-400/40 bg-emerald-400/10':'bg-white/10'}`;
+      div.innerHTML = `<div class="flex items-center gap-3"><span>${msg}</span>${action?`<button class="btn ripple px-2 py-1 rounded-lg bg-white/10">${action.label}</button>`:''}</div>`;
+      wrap.appendChild(div);
+      const btn = div.querySelector('button');
+      if (btn && action?.onClick) btn.addEventListener('click', ()=>{action.onClick(); div.remove();});
+      setTimeout(()=>div.remove(), 4000);
+    };
+
+    const modal = (html) => {
+      const wrap = $('#modalWrap');
+      $('#modalContent').innerHTML = html;
+      wrap.classList.remove('hidden');
+    };
+    const closeModal = () => $('#modalWrap').classList.add('hidden');
+
+    const updateHeader = () => {
+      const s = Store.get();
+      $('#xpText').textContent = `Lv ${s.level} · ${s.xp} XP`;
+      $('#coinText').textContent = `${s.coins}`;
+      $('#streakText').textContent = `${s.streakDays} days`;
+      $('#streakHeadline').textContent = `${s.streakDays}-day streak`;
+      const ring = $('#streakRing'); const total = 289; const prog = Math.min(1, s.streakDays/7); ring.style.strokeDashoffset = `${total - total*prog}`;
+      const daily = s.daily || {}; const today = Utils.todayKey();
+      const isToday = daily.lastKey === today; const done = !!daily.completed && isToday;
+      const badge = document.getElementById('dailyStatus'); const btn = document.getElementById('btnDaily');
+      if (badge) { badge.textContent = done ? 'Completed' : 'Available'; badge.className = `text-xs px-2 py-1 rounded-lg ${done?'bg-white/5 text-white/50':'bg-white/10'}`; }
+      if (btn) { btn.disabled = done; btn.classList.toggle('opacity-60', done); }
+    };
+
+    const renderChips = (cats) => {
+      const row = $('#categoryChips'); row.innerHTML='';
+      cats.forEach(c=>{
+        const b = document.createElement('button');
+        b.className = 'btn ripple focus-ring px-3 py-1.5 rounded-full bg-white/10 whitespace-nowrap';
+        b.textContent = c.name; b.dataset.id = c.id; b.addEventListener('click', ()=>{
+          $$('#categoryChips button').forEach(x=>x.classList.remove('bg-accent','text-white'));
+          b.classList.add('bg-accent','text-white');
+          Game.setCategory(c.id);
+        });
+        row.appendChild(b);
+      });
+      const first = row.querySelector('button'); if (first) first.click();
+    };
+
+    const renderAnswers = (answers, correct) => {
+      const wrap = $('#answers'); wrap.innerHTML='';
+      answers.forEach(a=>{
+        const btn = document.createElement('button');
+        btn.className = 'btn ripple focus-ring w-full px-4 py-3 rounded-xl bg-white/10 text-left';
+        const span = document.createElement('span');
+        span.textContent = a;
+        btn.appendChild(span);
+        btn.addEventListener('click', ()=> Game.submit(a));
+        wrap.appendChild(btn);
+      });
+    };
+
+    const updateAll = () => { updateHeader(); Settings.syncFromStore(); renderInventory(); Render.store(); };
+
+    const renderInventory = () => {
+      const s = Store.get(); const inv = $('#inventory'); if (!inv) return; inv.innerHTML='';
+      const keys = Object.keys(s.inventory);
+      if (!keys.length) { inv.innerHTML = '<div class="text-sm text-white/60">No items yet.</div>'; return; }
+      keys.forEach(k=>{
+        const c = document.createElement('div'); c.className = 'bg-white/5 rounded-xl p-3 flex items-center justify-between';
+        c.innerHTML = `<div class="capitalize">${k}</div><div class="text-sm">x${s.inventory[k]}</div>`;
+        inv.appendChild(c);
+      });
+    };
+
+    return { $, $$, toast, modal, closeModal, updateHeader, renderChips, renderAnswers, updateAll, renderInventory };
+  })();
+
+  // API with retries and decoding
+  const API = (() => {
+    const BASE = 'https://opentdb.com/api.php';
+    const categories = [
+      { id: 9, name: 'General' }, { id: 17, name: 'Science' }, { id: 23, name: 'History' },
+      { id: 21, name: 'Sports' }, { id: 22, name: 'Geography' }, { id: 12, name: 'Music' },
+      { id: 11, name: 'Films' }, { id: 18, name: 'Computers' }
+    ];
+
+    const fetchQuestions = async ({ amount=10, category=9, difficulty='easy', type='multiple', signal }) => {
+      const params = new URLSearchParams({ amount, category, difficulty, type });
+      const url = `${BASE}?${params.toString()}`;
+      const max = 3;
+      let attempt = 0; let delay = 400;
+      while (attempt < max) {
+        try {
+          const res = await fetch(url, { signal });
+          if (!res.ok) throw new Error('HTTP '+res.status);
+          const data = await res.json();
+          if (!data?.results?.length) throw new Error('No results');
+          const normalized = data.results.map(q=>({
+            question: Utils.decodeHtml(q.question),
+            correct: Utils.decodeHtml(q.correct_answer),
+            answers: shuffle([q.correct_answer, ...q.incorrect_answers].map(Utils.decodeHtml)),
+            type: q.type,
+            category: q.category,
+            difficulty: q.difficulty
+          }));
+          Store.cacheQuestions(normalized);
+          return normalized;
+        } catch (e) {
+          attempt++; if (attempt>=max) { throw e; } await new Promise(r=>setTimeout(r, delay)); delay*=2;
+        }
+      }
+    };
+
+    const shuffle = (arr) => {
+      for (let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+      return arr;
+    };
+
+    return { categories, fetchQuestions };
+  })();
+
+  // Game engine
+  const Game = (() => {
+    let current = { questions: [], idx: 0, correct: 0, coins: 0, xp: 0, timerMs: 15000, remaining: 15000, timeout: null, playing: false, category: 9 };
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const setCategory = (id) => { current.category = id; };
+
+    const start = async ({ amount, difficulty, type, daily=false }) => {
+      const controller = new AbortController();
+      const { signal } = controller;
+      const card = document.getElementById('questionCard');
+      skeleton(card, true);
+      try {
+        let qs = [];
+        if (!navigator.onLine && Store.get().cachedQuestions.length) { qs = Store.get().cachedQuestions.slice(0, amount); UI.toast('Offline Practice Mode', 'info'); }
+        else { qs = await API.fetchQuestions({ amount, category: current.category, difficulty, type, signal }); }
+        current.questions = qs; current.idx = 0; current.correct = 0; current.coins = 0; current.xp = 0; current.timerMs = 15000; current.remaining = current.timerMs; current.playing = true;
+        updateRoundUI();
+        nextQuestion();
+        if (daily) Store.setDaily({ lastKey: Utils.todayKey(), completed: false });
+      } catch (e) {
+        UI.toast('Failed to fetch questions', 'error', { label: 'Try again', onClick: ()=>start({ amount, difficulty, type, daily }) });
+      } finally { skeleton(card, false); }
+    };
+
+    const skeleton = (el, on) => { el.style.opacity = on? 0.6 : 1; el.style.pointerEvents = on? 'none':'auto'; };
+
+    const updateRoundUI = () => {
+      document.getElementById('qCounter').textContent = `Q ${current.idx+1}/${current.questions.length}`;
+      document.getElementById('roundCoins').textContent = current.coins;
+      document.getElementById('roundXP').textContent = current.xp;
+      document.getElementById('progressBar').style.width = `${(current.idx/current.questions.length)*100}%`;
+    };
+
+    const nextQuestion = () => {
+      if (current.idx >= current.questions.length) return endRound();
+      const q = current.questions[current.idx];
+      document.getElementById('questionText').textContent = q.question;
+      UI.renderAnswers(q.answers, q.correct);
+      startTimer();
+      updateRoundUI();
+    };
+
+    const startTimer = () => {
+      stopTimer();
+      const total = 314; let start = performance.now(); let last = start;
+      const ring = document.getElementById('timerRing');
+      const tick = (now) => {
+        const dt = now - last; last = now; current.remaining = Math.max(0, current.remaining - dt);
+        const p = current.remaining / current.timerMs; ring.style.strokeDashoffset = `${total * (1 - p)}`;
+        if (current.remaining <= 0) { submit(null); return; }
+        current.timeout = requestAnimationFrame(tick);
+      };
+      current.remaining = current.timerMs; current.timeout = requestAnimationFrame(tick);
+    };
+    const stopTimer = () => { if (current.timeout) cancelAnimationFrame(current.timeout); current.timeout = null; };
+
+    const submit = (answer) => {
+      if (!current.playing) return; current.playing = false; stopTimer();
+      const q = current.questions[current.idx];
+      const buttons = UI.$$('#answers button');
+      buttons.forEach(b=> b.disabled = true);
+      const correct = answer && answer === q.correct;
+      if (correct) {
+        current.correct++; current.coins += 2; current.xp += 10; Audio.play('correct'); Haptics.strong(); Bees.pulse('converge');
+      } else { Audio.play('wrong'); Haptics.medium(); gsap.to('#questionCard', { x: -6, duration: 0.06, repeat: 5, yoyo: true, ease: 'sine.inOut' }); Bees.pulse('scatter'); }
+      buttons.forEach(b=>{ if (b.textContent === q.correct) b.classList.add('bg-emerald-500/20'); if (b.textContent === answer && !correct) b.classList.add('bg-red-500/20'); });
+      if (!reduceMotion) {
+        gsap.fromTo('#questionCard', { scale: correct?0.98:1 }, { scale: 1, duration: 0.18, ease: 'power2.out' });
+        gsap.to('#progressBar', { width: `${((current.idx+1)/current.questions.length)*100}%`, duration: 0.2, ease: 'power2.out' });
+      } else {
+        document.getElementById('progressBar').style.width = `${((current.idx+1)/current.questions.length)*100}%`;
+      }
+      setTimeout(()=>{ current.idx++; current.playing = true; nextQuestion(); }, 520);
+    };
+
+    const usePower = (key) => {
+      const s = Store.get();
+      if (s.inventory[key] <= 0) { UI.toast('Not enough items', 'error'); return; }
+      const q = current.questions[current.idx];
+      if (key==='p5050') {
+        const wrongs = UI.$$('#answers button').filter(b=>b.textContent!==q.correct);
+        wrongs.slice(0,2).forEach(b=> b.disabled = true);
+      } else if (key==='pTime') {
+        current.remaining = Math.min(current.remaining + 10000, current.timerMs + 20000);
+      } else if (key==='pSkip') {
+        submit(q.correct);
+      }
+      Store.adjustInventory(key, -1);
+      spark();
+    };
+
+    const spark = () => {
+      const el = document.getElementById('questionCard');
+      const s = document.createElement('div');
+      s.style.position='absolute'; s.style.inset='0'; s.style.pointerEvents='none';
+      s.innerHTML = '<svg width="100%" height="100%" viewBox="0 0 100 60" preserveAspectRatio="none">'+
+        '<g stroke="rgba(255,255,255,0.6)" stroke-width="0.6">'+
+        '<path d="M10 30 Q 20 10, 30 30"/><path d="M40 30 Q 50 10, 60 30"/><path d="M70 30 Q 80 10, 90 30"/>'+
+        '</g></svg>';
+      el.appendChild(s); setTimeout(()=>s.remove(), 420);
+    };
+
+    const endRound = () => {
+      stopTimer();
+      const total = current.questions.length; const acc = total? Math.round((current.correct/total)*100) : 0;
+      const coins = current.coins + (acc>=80?5:0); const xp = current.xp + (acc>=80?20:0);
+      const reward = { coins, xp };
+      const online = navigator.onLine;
+      if (online) { Store.addCoins(coins); Store.addXP(xp); }
+      else { Store.queueReward(reward); UI.toast('Rewards queued (offline)', 'info'); }
+      if (Store.get().daily?.lastKey === Utils.todayKey()) { Store.setDaily({ completed: true }); }
+      UI.modal(`
+        <h3 id="modalTitle" class="text-xl font-semibold">Round Complete</h3>
+        <div class="mt-2 text-sm text-white/70">Score: ${current.correct}/${total} · Accuracy ${acc}%</div>
+        <div class="mt-4 grid grid-cols-2 gap-2">
+          <div class="bg-white/5 rounded-xl p-3 flex items-center justify-between"><span>Coins</span><span class="text-yellow-300">+${coins}</span></div>
+          <div class="bg-white/5 rounded-xl p-3 flex items-center justify-between"><span>XP</span><span class="text-accent">+${xp}</span></div>
+        </div>
+        <div class="mt-4 flex gap-2">
+          <button id="mReplay" class="btn ripple px-4 py-2 rounded-xl bg-accent text-white">Replay</button>
+          <button id="mSettings" class="btn ripple px-4 py-2 rounded-xl bg-white/10">Change Settings</button>
+          <button id="mHome" class="btn ripple px-4 py-2 rounded-xl bg-white/10">Home</button>
+        </div>
+      `);
+      document.getElementById('mReplay').onclick = ()=> { UI.closeModal(); startFromUI(); };
+      document.getElementById('mSettings').onclick = ()=> { UI.closeModal(); location.hash = '#/play'; };
+      document.getElementById('mHome').onclick = ()=> { UI.closeModal(); location.hash = '#/home'; };
+      Achievements.evaluate({ total, correct: current.correct, acc });
+    };
+
+    const startFromUI = () => {
+      const amount = parseInt(document.getElementById('amount').value, 10);
+      const difficulty = document.getElementById('difficulty').value;
+      const type = document.getElementById('type').value;
+      start({ amount, difficulty, type });
+    };
+
+    return { start, submit, usePower, setCategory, startFromUI };
+  })();
+
+  // Achievements
+  const Achievements = (() => {
+    const defs = [
+      { id:'first_win', name:'First Win', desc:'Finish a round', test: ({ total })=> total>0 },
+      { id:'perfect', name:'Perfect Round', desc:'100% accuracy', test: ({ acc })=> acc===100 },
+      { id:'fast', name:'Fast Thinker', desc:'Finish with >50% time left', test: ()=>true },
+      { id:'ten_row', name:'Ten in a Row', desc:'10 correct in a row', test: ({ correct })=> correct>=10 },
+      { id:'cat_master', name:'Category Master', desc:'Win in 3 categories', test: ()=>false },
+      { id:'night_owl', name:'Night Owl', desc:'Play after 10pm', test: ()=> new Date().getHours()>=22 },
+      { id:'streak_3', name:'Streak 3', desc:'3-day login streak', test: ()=> Store.get().streakDays>=3 },
+      { id:'streak_7', name:'Streak 7', desc:'7-day login streak', test: ()=> Store.get().streakDays>=7 },
+      { id:'coin_100', name:'Saver', desc:'Have 100 coins', test: ()=> Store.get().coins>=100 },
+      { id:'lvl_5', name:'Level 5', desc:'Reach level 5', test: ()=> Store.get().level>=5 },
+      { id:'practice', name:'Practice Pro', desc:'Complete offline round', test: ()=> !navigator.onLine },
+      { id:'daily', name:'Dedication', desc:'Complete daily challenge', test: ()=> Store.get().daily.completed }
+    ];
+    const evaluate = (ctx) => {
+      const s = Store.get();
+      const newly = [];
+      defs.forEach(a=>{
+        if (!s.achievements[a.id] && a.test(ctx)) { s.achievements[a.id] = true; newly.push(a); }
+      });
+      if (newly.length) {
+        Store.addCoins(newly.length*5);
+        UI.toast(`Unlocked ${newly.length} achievement(s)!`, 'success');
+        confetti();
+      }
+      localStorage.setItem('quizbee_state_v1', JSON.stringify(Store.get()));
+      Render.achievements();
+    };
+    const list = () => defs.map(d=> ({...d, unlocked: !!Store.get().achievements[d.id]}));
+    return { evaluate, list };
+  })();
+
+  // Confetti
+  function confetti() {
+    const canvas = document.createElement('canvas');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight; canvas.style.cssText='position:fixed;inset:0;z-index:75;pointer-events:none';
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+    const pieces = Array.from({ length: 160 }, ()=>({
+      x: Math.random()*canvas.width,
+      y: -20 - Math.random()*canvas.height,
+      r: 4+Math.random()*6,
+      c: Utils.choice(['#f59e0b','#10b981','#3b82f6','#a855f7','#ef4444'])
+    }));
+    let anim;
+    const draw = () => {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      pieces.forEach(p=>{ ctx.fillStyle=p.c; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill(); p.y += 2+Math.random()*3; p.x += Math.sin(p.y/20); });
+      if (pieces.every(p=>p.y>canvas.height+20)) { cancelAnimationFrame(anim); canvas.remove(); } else { anim = requestAnimationFrame(draw); }
+    };
+    draw();
+  }
+
+  // Router
+  const Router = (() => {
+    const routes = ['home','play','achievements','store','settings'];
+    const go = (name) => {
+      if (!routes.includes(name)) name='home';
+      document.querySelectorAll('[data-route]').forEach(v=> v.classList.add('hidden'));
+      const el = document.querySelector(`[data-route="${name}"]`);
+      el.classList.remove('hidden');
+      gsap.fromTo(el, { y: 12, opacity: 0 }, { y: 0, opacity: 1, duration: 0.22, ease: 'power2.out' });
+      document.querySelectorAll('.nav-btn').forEach(b=> b.setAttribute('aria-selected','false'));
+      document.querySelector(`.nav-btn[data-link="${name}"]`).setAttribute('aria-selected','true');
+      if (name==='achievements') Render.achievements();
+      if (name==='store') Render.store();
+    };
+    const init = () => {
+      document.querySelectorAll('.nav-btn').forEach(b=> b.addEventListener('click', ()=> { location.hash = `#/${b.dataset.link}`; Audio.play('tap'); Haptics.light(); }));
+      window.addEventListener('hashchange', ()=> go(location.hash.replace('#/','')||'home'));
+      go(location.hash.replace('#/','')||'home');
+    };
+    return { init };
+  })();
+
+  // Renderers for specific screens
+  const Render = (() => {
+    const achGrid = () => {
+      const grid = document.getElementById('achGrid'); if (!grid) return; grid.innerHTML='';
+      Achievements.list().forEach(a=>{
+        const card = document.createElement('div');
+        card.className = `rounded-2xl p-4 border border-white/10 ${a.unlocked?'bg-emerald-400/10':'bg-white/5'} flex items-start gap-3`;
+        card.innerHTML = `<div class="w-10 h-10 rounded-xl bg-white/10 grid place-items-center ${a.unlocked?'text-emerald-400':'text-white/50'}"><svg width="20" height="20"><use href="#i-trophy"/></svg></div><div><div class="font-semibold">${a.name}</div><div class="text-xs text-white/60">${a.desc}</div></div>`;
+        grid.appendChild(card);
+      });
+    };
+
+    const store = () => {
+      const packs = [ { coins:50, cost:0 }, { coins:120, cost:0 }, { coins:300, cost:0 } ];
+      const coinWrap = document.getElementById('coinPacks'); coinWrap.innerHTML='';
+      packs.forEach(p=>{
+        const c = document.createElement('div'); c.className='bg-white/5 rounded-xl p-3 flex flex-col gap-2';
+        c.innerHTML = `<div class="text-sm">${p.coins} coins</div><button class="btn ripple px-3 py-2 rounded-lg bg-accent/90 text-white">Claim</button>`;
+        c.querySelector('button').onclick = ()=> { Store.addCoins(p.coins); UI.toast(`+${p.coins} coins`, 'success'); };
+        coinWrap.appendChild(c);
+      });
+      const powerWrap = document.getElementById('powerUps'); powerWrap.innerHTML='';
+      [ {k:'p5050', name:'50/50', price:20}, {k:'pTime', name:'+10s', price:15}, {k:'pSkip', name:'Skip', price:10} ].forEach(p=>{
+        const c = document.createElement('div'); c.className='bg-white/5 rounded-xl p-3 flex flex-col gap-2';
+        c.innerHTML = `<div class="text-sm">${p.name}</div><div class="text-xs text-white/60">Cost ${p.price} coins</div><button class="btn ripple px-3 py-2 rounded-lg bg-white/10">Buy</button>`;
+        c.querySelector('button').onclick = ()=> { if (Store.spendCoins(p.price)) { Store.adjustInventory(p.k, +1); UI.toast(`Bought ${p.name}`, 'success'); } else UI.toast('Not enough coins','error'); };
+        powerWrap.appendChild(c);
+      });
+    };
+
+    return { achievements: achGrid, store };
+  })();
+
+  // Bees background
+  const Bees = (() => {
+    const mount = document.getElementById('bees');
+    const beeCount = 8;
+    const bees = [];
+
+    const makeBee = (i) => {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      el.setAttribute('width','26'); el.setAttribute('height','26'); el.style.position='absolute'; el.style.opacity = 0.8;
+      el.innerHTML = `<g transform="translate(13,13)">
+        <circle r="8" fill="rgba(255,255,255,0.85)"/>
+        <circle r="8" fill="url(#g${i})"/>
+        <g><rect x="-8" y="-2" width="16" height="4" fill="rgba(0,0,0,0.18)"/></g>
+        <circle cx="-3" cy="-1" r="1.5" fill="#000"/>
+        <circle cx="3" cy="-1" r="1.5" fill="#000"/>
+      </g>`;
+      const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+      const grad = document.createElementNS('http://www.w3.org/2000/svg','linearGradient');
+      grad.setAttribute('id',`g${i}`); grad.setAttribute('x1','0'); grad.setAttribute('x2','1');
+      grad.innerHTML = `<stop offset="0%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#fbbf24"/>`;
+      defs.appendChild(grad); el.prepend(defs);
+      mount.appendChild(el);
+      return el;
+    };
+
+    const animateBee = (el, i) => {
+      const path = randomPath();
+      gsap.set(el, { x: Math.random()*window.innerWidth, y: Math.random()*window.innerHeight });
+      if (!reduceMotion) {
+        gsap.to(el, { duration: 18+Math.random()*8, repeat: -1, ease: 'none', motionPath: { path, autoRotate: false } });
+        gsap.to(el, { scale: 0.92 + Math.random()*0.16, duration: 3+Math.random()*2, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+      }
+    };
+
+    const randomPath = () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      const pts = Array.from({length: 6}, ()=> ({ x: Math.random()*w, y: Math.random()*h }));
+      const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+      p.setAttribute('d', `M ${pts.map(p=>`${p.x},${p.y}`).join(' C ')}`);
+      svg.appendChild(p);
+      return p;
+    };
+
+    const init = () => {
+      for (let i=0;i<beeCount;i++){ const b = makeBee(i); bees.push(b); animateBee(b,i); }
+      window.addEventListener('resize', Utils.debounce(()=>{ bees.forEach(b=> gsap.killTweensOf(b)); mount.innerHTML=''; bees.length=0; init(); }, 400));
+    };
+    const pulse = (mode) => {
+      const card = document.getElementById('questionCard');
+      const rect = card.getBoundingClientRect();
+      const cx = rect.left + rect.width/2; const cy = rect.top + rect.height/2;
+      bees.forEach(b=>{
+        const br = b.getBoundingClientRect();
+        const dx = cx - (br.left + br.width/2);
+        const dy = cy - (br.top + br.height/2);
+        const mag = Math.hypot(dx, dy);
+        const nx = dx / (mag||1), ny = dy / (mag||1);
+        const dist = mode==='converge' ? 20 : -30;
+        gsap.to(b, { x: `+=${nx*dist}`, y: `+=${ny*dist}`, duration: 0.25, yoyo: true, repeat: 1, ease: 'power2.out' });
+      });
+    };
+    return { init, pulse };
+  })();
+
+  // Settings sync
+  const Settings = (() => {
+    const syncFromStore = () => {
+      const s = Store.get().settings;
+      document.getElementById('toggleSound').checked = !!s.sound;
+      document.getElementById('toggleHaptics').checked = !!s.haptics;
+      document.getElementById('animLevel').value = s.anim;
+      document.getElementById('fontSize').value = s.font;
+    };
+    const attach = () => {
+      document.getElementById('toggleSound').addEventListener('change', (e)=> Store.setSetting('sound', e.target.checked));
+      document.getElementById('toggleHaptics').addEventListener('change', (e)=> Store.setSetting('haptics', e.target.checked));
+      document.getElementById('animLevel').addEventListener('change', (e)=> Store.setSetting('anim', e.target.value));
+      document.getElementById('fontSize').addEventListener('change', (e)=> { Store.setSetting('font', e.target.value); document.documentElement.style.fontSize = e.target.value==='XL'? '18px' : e.target.value==='Large'? '16px' : '15px'; });
+      document.getElementById('btnReset').addEventListener('click', ()=> UI.modal(`<h3 id='modalTitle' class='text-lg font-semibold'>Reset Data?</h3><p class='text-sm text-white/70 mt-2'>This will clear all progress.</p><div class='mt-4 flex gap-2'><button id='dYes' class='btn ripple px-4 py-2 rounded-xl bg-red-500/80 text-white'>Reset</button><button id='dNo' class='btn ripple px-4 py-2 rounded-xl bg-white/10'>Cancel</button></div>`));
+      document.getElementById('btnAbout').addEventListener('click', ()=> UI.modal(`<h3 id='modalTitle' class='text-lg font-semibold'>About</h3><p class='text-sm text-white/70 mt-2'>QuizBee v1.0 — A single-file premium quiz experience. Privacy-first: no tracking, no accounts.</p><div class='mt-4'><button id='aOk' class='btn ripple px-4 py-2 rounded-xl bg-accent text-white'>OK</button></div>`));
+      document.addEventListener('click', (e)=>{
+        if (e.target.id==='dYes') { Store.reset(); UI.closeModal(); }
+        if (e.target.id==='dNo' || e.target.id==='aOk') UI.closeModal();
+      });
+    };
+    return { syncFromStore, attach };
+  })();
+
+  // Onboarding
+  const Onboarding = (() => {
+    const steps = [
+      { t:'Welcome to QuizBee', b:'Play fast quizzes and earn XP/coins.' },
+      { t:'Play', b:'Choose categories and start challenging rounds.' },
+      { t:'Power-ups', b:'Use 50/50, add time, or skip with inventory.' },
+      { t:'Achievements', b:'Unlock badges and get coin rewards.' },
+      { t:'Store', b:'Buy power-ups with in-game coins.' }
+    ];
+    let idx = 0;
+    const show = () => {
+      const seen = localStorage.getItem('quizbee_onboarding_v1');
+      if (seen) return; document.getElementById('onboarding').classList.remove('hidden');
+      render();
+      document.getElementById('obSkip').onclick = finish;
+      document.getElementById('obNext').onclick = next;
+    };
+    const render = () => {
+      document.getElementById('obTitle').textContent = steps[idx].t;
+      document.getElementById('obBody').textContent = steps[idx].b;
+      const dots = document.getElementById('obDots'); dots.innerHTML = steps.map((_,i)=>`<span class="w-2 h-2 rounded-full ${i===idx?'bg-accent':'bg-white/20'}"></span>`).join('');
+    };
+    const next = () => { idx++; if (idx>=steps.length) return finish(); render(); };
+    const finish = () => { document.getElementById('onboarding').classList.add('hidden'); localStorage.setItem('quizbee_onboarding_v1','1'); };
+    return { show };
+  })();
+
+  // Pull-to-refresh on Play
+  function setupPullToRefresh() {
+    const el = document.querySelector('[data-route="play"]');
+    let startY = 0; let pulling = false;
+    el.addEventListener('touchstart', (e)=>{ if (window.scrollY<=0){ startY = e.touches[0].clientY; pulling = true; } });
+    el.addEventListener('touchmove', (e)=>{ if (!pulling) return; const dy = e.touches[0].clientY - startY; if (dy>80){ pulling=false; Game.startFromUI(); UI.toast('Refreshing questions', 'info'); } });
+    el.addEventListener('touchend', ()=> pulling=false);
+  }
+
+  // Event wiring
+  function wire() {
+    document.getElementById('btnQuickStart').addEventListener('click', ()=> { location.hash = '#/play'; Game.start({ amount: 10, difficulty: 'easy', type: 'multiple' }); });
+    document.getElementById('btnDaily').addEventListener('click', ()=> startDaily());
+    document.getElementById('p5050').addEventListener('click', ()=> Game.usePower('p5050'));
+    document.getElementById('pTime').addEventListener('click', ()=> Game.usePower('pTime'));
+    document.getElementById('pSkip').addEventListener('click', ()=> Game.usePower('pSkip'));
+    document.getElementById('difficulty').addEventListener('change', ()=> Game.startFromUI());
+    document.getElementById('amount').addEventListener('change', ()=> Game.startFromUI());
+    document.getElementById('type').addEventListener('change', ()=> Game.startFromUI());
+  }
+
+  function startDaily() {
+    const seed = parseInt(Utils.todayKey().replace(/-/g,''), 10);
+    const rng = Utils.seedPRNG(seed);
+    const amount = 10; const difficulty = ['easy','medium','hard'][Math.floor(rng()*3)];
+    const today = Utils.todayKey();
+    const daily = Store.get().daily || {};
+    if (daily.lastKey === today && daily.completed) { UI.toast('Daily Challenge already completed. Come back tomorrow.', 'info'); return; }
+    Store.setDaily({ lastKey: today, completed: false });
+    location.hash = '#/play';
+    Game.start({ amount, difficulty, type: 'multiple', daily: true });
+  }
+
+  // Network sync for queued rewards
+  window.addEventListener('online', ()=> { if (Store.get().rewardsQueue.length) { Store.flushRewards(); UI.toast('Synced offline rewards', 'success'); } });
+
+  // Init
+  document.addEventListener('DOMContentLoaded', async () => {
+    Router.init();
+    Settings.attach();
+    UI.updateAll();
+    UI.renderChips(API.categories);
+    Bees.init();
+    Render.achievements(); Render.store();
+    Onboarding.show();
+    setupPullToRefresh();
+    wire();
+    UI.updateHeader();
+  });
+  </script>
+</body>
+</html>
