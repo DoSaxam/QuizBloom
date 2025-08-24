@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuizBee - Premium Quiz Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .bee {
+            pointer-events: none;
+        }
+        
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0);
+            animation: ripple 0.6s linear;
+        }
+        
+        @keyframes ripple {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+        
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.35s;
+            transform-origin: 50% 50%;
+        }
+        
+        .bee-path {
+            fill: none;
+            stroke: rgba(255, 193, 7, 0.1);
+            stroke-width: 1;
+        }
+        
+        .noise {
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+        }
+        
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #fbbf24;
+            animation: confetti-fall 3s linear forwards;
+        }
+        
+        @keyframes confetti-fall {
+            to {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+        
+        .slide-enter {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        
+        .slide-enter-active {
+            transform: translateX(0);
+            opacity: 1;
+            transition: all 0.3s ease-out;
+        }
+        
+        .slide-exit {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        
+        .slide-exit-active {
+            transform: translateX(-100%);
+            opacity: 0;
+            transition: all 0.3s ease-in;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-amber-50 via-yellow-100 to-orange-100 min-h-screen overflow-x-hidden">
+    <!-- Background Bees Container -->
+    <div id="bee-container" class="fixed inset-0 pointer-events-none z-0"></div>
+    
+    <!-- Noise Overlay -->
+    <div class="noise fixed inset-0 pointer-events-none z-10"></div>
+    
+    <!-- Main Content -->
+    <div class="relative z-20 min-h-screen pb-20">
+        <!-- Home Screen -->
+        <div id="home-screen" class="screen active">
+            <div class="container mx-auto px-4 pt-8">
+                <!-- Header -->
+                <div class="text-center mb-8">
+                    <h1 class="text-4xl font-bold text-gray-800 mb-2 shimmer">QuizBee</h1>
+                    <p class="text-gray-600">Master knowledge, earn rewards</p>
+                </div>
+                
+                <!-- Daily Streak Widget -->
+                <div class="glass-card rounded-2xl p-6 mb-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">Daily Streak</h3>
+                            <p class="text-gray-600">Keep the momentum!</p>
+                        </div>
+                        <div class="relative">
+                            <svg class="w-16 h-16" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="8"/>
+                                <circle id="streak-progress" cx="50" cy="50" r="45" fill="none" stroke="#fbbf24" stroke-width="8" 
+                                        stroke-dasharray="283" stroke-dashoffset="283" class="progress-ring-circle"/>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span id="streak-count" class="text-xl font-bold text-gray-800">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Daily Challenge -->
+                <div class="glass-card rounded-2xl p-6 mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">Daily Challenge</h3>
+                        <div class="flex items-center space-x-2">
+                            <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                            <span class="text-sm text-gray-600">+50 XP</span>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 mb-4">10 curated questions, single try per day</p>
+                    <button id="daily-challenge-btn" class="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-transform">
+                        Start Challenge
+                    </button>
+                </div>
+                
+                <!-- Quick Start -->
+                <div class="glass-card rounded-2xl p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Quick Start</h3>
+                    <button id="quick-start-btn" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold py-4 px-6 rounded-xl hover:scale-105 transition-transform">
+                        Play Now
+                    </button>
+                </div>
+                
+                <!-- Recent Achievements -->
+                <div class="glass-card rounded-2xl p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Recent Achievements</h3>
+                    <div id="recent-achievements" class="flex space-x-3 overflow-x-auto">
+                        <!-- Achievements will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Play Screen -->
+        <div id="play-screen" class="screen hidden">
+            <div class="container mx-auto px-4 pt-8">
+                <!-- Game Settings -->
+                <div class="glass-card rounded-2xl p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Game Settings</h3>
+                    
+                    <!-- Categories -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                        <div id="category-chips" class="flex space-x-2 overflow-x-auto">
+                            <!-- Categories will be populated here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Difficulty -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Difficulty</label>
+                        <div class="flex space-x-2">
+                            <button class="difficulty-btn active bg-green-500 text-white px-4 py-2 rounded-lg" data-difficulty="easy">Easy</button>
+                            <button class="difficulty-btn bg-yellow-500 text-white px-4 py-2 rounded-lg" data-difficulty="medium">Medium</button>
+                            <button class="difficulty-btn bg-red-500 text-white px-4 py-2 rounded-lg" data-difficulty="hard">Hard</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question Count -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Questions</label>
+                        <select id="question-count" class="w-full p-3 border border-gray-300 rounded-lg bg-white">
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="15">15</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
+                    
+                    <button id="start-game-btn" class="w-full bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-transform">
+                        Start Game
+                    </button>
+                </div>
+                
+                <!-- Game Area -->
+                <div id="game-area" class="hidden">
+                    <!-- Progress Bar -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-4">
+                            <span id="question-counter" class="text-lg font-semibold text-gray-800">Q 1/10</span>
+                            <div class="flex items-center space-x-2">
+                                <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
+                                </svg>
+                                <span id="coin-count" class="text-lg font-semibold text-gray-800">0</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                            <span id="xp-count" class="text-lg font-semibold text-gray-800">0</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Timer -->
+                    <div class="flex justify-center mb-6">
+                        <div class="relative">
+                            <svg class="w-20 h-20" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="8"/>
+                                <circle id="timer-progress" cx="50" cy="50" r="45" fill="none" stroke="#ef4444" stroke-width="8" 
+                                        stroke-dasharray="283" stroke-dashoffset="0" class="progress-ring-circle"/>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span id="timer-text" class="text-xl font-bold text-gray-800">30</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Question Card -->
+                    <div id="question-card" class="glass-card rounded-2xl p-6 mb-6">
+                        <h3 id="question-text" class="text-lg font-semibold text-gray-800 mb-6">Loading question...</h3>
+                        <div id="answer-buttons" class="space-y-3">
+                            <!-- Answer buttons will be populated here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Power-ups -->
+                    <div class="glass-card rounded-2xl p-4">
+                        <h4 class="text-sm font-medium text-gray-700 mb-3">Power-ups</h4>
+                        <div class="flex space-x-3">
+                            <button id="fifty-fifty" class="power-up-btn flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
+                                <svg class="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                                </svg>
+                                50:50 (25 coins)
+                            </button>
+                            <button id="add-time" class="power-up-btn flex-1 bg-green-500 text-white py-2 px-4 rounded-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
+                                <svg class="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                                </svg>
+                                +15s (20 coins)
+                            </button>
+                            <button id="skip" class="power-up-btn flex-1 bg-purple-500 text-white py-2 px-4 rounded-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
+                                <svg class="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                                Skip (30 coins)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Achievements Screen -->
+        <div id="achievements-screen" class="screen hidden">
+            <div class="container mx-auto px-4 pt-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Achievements</h2>
+                <div id="achievements-grid" class="grid grid-cols-2 gap-4">
+                    <!-- Achievements will be populated here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Store Screen -->
+        <div id="store-screen" class="screen hidden">
+            <div class="container mx-auto px-4 pt-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Store</h2>
+                
+                <!-- Coin Balance -->
+                <div class="glass-card rounded-2xl p-4 mb-6">
+                    <div class="flex items-center justify-center space-x-2">
+                        <svg class="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
+                        </svg>
+                        <span id="store-coin-balance" class="text-2xl font-bold text-gray-800">0</span>
+                    </div>
+                </div>
+                
+                <!-- Power-ups -->
+                <div class="space-y-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Power-ups</h3>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div class="glass-card rounded-2xl p-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">50:50 Eliminator</h4>
+                                    <p class="text-sm text-gray-600">Remove two wrong answers</p>
+                                </div>
+                                <button class="buy-btn bg-blue-500 text-white px-4 py-2 rounded-lg hover:scale-105 transition-transform" data-item="fifty-fifty" data-cost="25">
+                                    Buy (25 coins)
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card rounded-2xl p-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">Time Booster</h4>
+                                    <p class="text-sm text-gray-600">Add 15 seconds to timer</p>
+                                </div>
+                                <button class="buy-btn bg-green-500 text-white px-4 py-2 rounded-lg hover:scale-105 transition-transform" data-item="add-time" data-cost="20">
+                                    Buy (20 coins)
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card rounded-2xl p-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">Question Skip</h4>
+                                    <p class="text-sm text-gray-600">Skip current question</p>
+                                </div>
+                                <button class="buy-btn bg-purple-500 text-white px-4 py-2 rounded-lg hover:scale-105 transition-transform" data-item="skip" data-cost="30">
+                                    Buy (30 coins)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Screen -->
+        <div id="settings-screen" class="screen hidden">
+            <div class="container mx-auto px-4 pt-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Settings</h2>
+                
+                <div class="space-y-6">
+                    <!-- Sound Settings -->
+                    <div class="glass-card rounded-2xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Audio</h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-700">Sound Effects</span>
+                                <button id="sound-toggle" class="toggle-btn bg-green-500 text-white px-4 py-2 rounded-lg">
+                                    ON
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Haptics Settings -->
+                    <div class="glass-card rounded-2xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Haptics</h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-700">Vibration</span>
+                                <button id="haptics-toggle" class="toggle-btn bg-green-500 text-white px-4 py-2 rounded-lg">
+                                    ON
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Animation Settings -->
+                    <div class="glass-card rounded-2xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Animations</h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-700">Intensity</span>
+                                <select id="animation-intensity" class="p-2 border border-gray-300 rounded-lg bg-white">
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Data Management -->
+                    <div class="glass-card rounded-2xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Data</h3>
+                        <button id="reset-data-btn" class="w-full bg-red-500 text-white py-3 px-6 rounded-xl hover:scale-105 transition-transform">
+                            Reset All Data
+                        </button>
+                    </div>
+                    
+                    <!-- About -->
+                    <div class="glass-card rounded-2xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">About</h3>
+                        <p class="text-gray-600 mb-2">QuizBee v1.0.0</p>
+                        <p class="text-gray-600 mb-4">A premium quiz game with gamified progression and achievements.</p>
+                        <p class="text-sm text-gray-500">Powered by Open Trivia DB API</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bottom Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-gray-200 z-50">
+        <div class="flex justify-around">
+            <button class="nav-btn active flex flex-col items-center py-3 px-4" data-screen="home">
+                <svg class="w-6 h-6 mb-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+                </svg>
+                <span class="text-xs">Home</span>
+            </button>
+            <button class="nav-btn flex flex-col items-center py-3 px-4" data-screen="play">
+                <svg class="w-6 h-6 mb-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>
+                </svg>
+                <span class="text-xs">Play</span>
+            </button>
+            <button class="nav-btn flex flex-col items-center py-3 px-4" data-screen="achievements">
+                <svg class="w-6 h-6 mb-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                </svg>
+                <span class="text-xs">Achievements</span>
+            </button>
+            <button class="nav-btn flex flex-col items-center py-3 px-4" data-screen="store">
+                <svg class="w-6 h-6 mb-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span class="text-xs">Store</span>
+            </button>
+            <button class="nav-btn flex flex-col items-center py-3 px-4" data-screen="settings">
+                <svg class="w-6 h-6 mb-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+                </svg>
+                <span class="text-xs">Settings</span>
+            </button>
+        </div>
+    </nav>
+    
+    <!-- Modals -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black/50 z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div id="modal-content" class="glass-card rounded-2xl p-6 max-w-md w-full">
+                <!-- Modal content will be populated here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    
+    <!-- Confetti Container -->
+    <div id="confetti-container" class="fixed inset-0 pointer-events-none z-40"></div>
+    
+    <script>
+        // QuizBee App - Production Grade Single File Application
+        
+        (function() {
+            'use strict';
+            
+            // ===== STATE MANAGEMENT =====
+            const store = {
+                state: {
+                    xp: 0,
+                    coins: 0,
+                    streak: 0,
+                    level: 1,
+                    achievements: [],
+                    inventory: {
+                        'fifty-fifty': 0,
+                        'add-time': 0,
+                        'skip': 0
+                    },
+                    settings: {
+                        sound: true,
+                        haptics: true,
+                        animationIntensity: 'medium'
+                    },
+                    dailyChallenge: {
+                        completed: false,
+                        lastCompleted: null
+                    },
+                    stats: {
+                        gamesPlayed: 0,
+                        questionsAnswered: 0,
+                        correctAnswers: 0,
+                        perfectRounds: 0
+                    }
+                },
+                
+                init() {
+                    const saved = localStorage.getItem('quizbee-state');
+                    if (saved) {
+                        this.state = { ...this.state, ...JSON.parse(saved) };
+                    }
+                    this.updateUI();
+                },
+                
+                save() {
+                    localStorage.setItem('quizbee-state', JSON.stringify(this.state));
+                },
+                
+                updateUI() {
+                    document.getElementById('xp-count').textContent = this.state.xp;
+                    document.getElementById('store-coin-balance').textContent = this.state.coins;
+                    document.getElementById('streak-count').textContent = this.state.streak;
+                    
+                    const streakProgress = document.getElementById('streak-progress');
+                    const progress = Math.min(this.state.streak / 7, 1);
+                    streakProgress.style.strokeDashoffset = 283 * (1 - progress);
+                },
+                
+                addXP(amount) {
+                    this.state.xp += amount;
+                    const oldLevel = this.state.level;
+                    this.state.level = Math.floor(this.state.xp / 100) + 1;
+                    
+                    if (this.state.level > oldLevel) {
+                        this.levelUp();
+                    }
+                    
+                    this.save();
+                    this.updateUI();
+                },
+                
+                addCoins(amount) {
+                    this.state.coins += amount;
+                    this.save();
+                    this.updateUI();
+                },
+                
+                levelUp() {
+                    audio.play('levelup');
+                    haptics.strong();
+                    confetti.burst();
+                    toast.show('Level Up! 🎉', 'success');
+                }
+            };
+            
+            // ===== ROUTER =====
+            const router = {
+                currentScreen: 'home',
+                
+                init() {
+                    window.addEventListener('hashchange', () => this.handleRoute());
+                    this.handleRoute();
+                },
+                
+                handleRoute() {
+                    const hash = window.location.hash.slice(1) || 'home';
+                    this.navigate(hash);
+                },
+                
+                navigate(screen) {
+                    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+                    
+                    const targetScreen = document.getElementById(`${screen}-screen`);
+                    if (targetScreen) {
+                        targetScreen.classList.remove('hidden');
+                        this.currentScreen = screen;
+                    }
+                    
+                    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                    document.querySelector(`[data-screen="${screen}"]`).classList.add('active');
+                    
+                    window.location.hash = screen;
+                }
+            };
+            
+            // ===== API CLIENT =====
+            const api = {
+                baseUrl: 'https://opentdb.com/api.php',
+                
+                async fetchQuestions(category, difficulty, amount) {
+                    const params = new URLSearchParams({
+                        amount: amount,
+                        category: category,
+                        difficulty: difficulty,
+                        type: 'multiple'
+                    });
+                    
+                    try {
+                        const response = await fetch(`${this.baseUrl}?${params}`);
+                        const data = await response.json();
+                        
+                        if (data.response_code === 0) {
+                            return data.results.map(q => ({
+                                question: this.decodeHTML(q.question),
+                                correct: this.decodeHTML(q.correct_answer),
+                                incorrect: q.incorrect_answers.map(a => this.decodeHTML(a)),
+                                category: q.category,
+                                difficulty: q.difficulty
+                            }));
+                        } else {
+                            throw new Error('No questions available');
+                        }
+                    } catch (error) {
+                        console.error('API Error:', error);
+                        throw error;
+                    }
+                },
+                
+                decodeHTML(text) {
+                    const textarea = document.createElement('textarea');
+                    textarea.innerHTML = text;
+                    return textarea.value;
+                }
+            };
+            
+            // ===== GAME LOGIC =====
+            const game = {
+                currentQuestions: [],
+                currentQuestionIndex: 0,
+                score: 0,
+                timer: null,
+                timeLeft: 30,
+                isPlaying: false,
+                
+                async startGame(category, difficulty, amount) {
+                    try {
+                        this.currentQuestions = await api.fetchQuestions(category, difficulty, amount);
+                        this.currentQuestionIndex = 0;
+                        this.score = 0;
+                        this.isPlaying = true;
+                        
+                        document.getElementById('game-area').classList.remove('hidden');
+                        this.showQuestion();
+                        this.startTimer();
+                        
+                        store.state.stats.gamesPlayed++;
+                        store.save();
+                        
+                    } catch (error) {
+                        toast.show('Failed to load questions. Please try again.', 'error');
+                    }
+                },
+                
+                showQuestion() {
+                    if (this.currentQuestionIndex >= this.currentQuestions.length) {
+                        this.endGame();
+                        return;
+                    }
+                    
+                    const question = this.currentQuestions[this.currentQuestionIndex];
+                    document.getElementById('question-text').textContent = question.question;
+                    document.getElementById('question-counter').textContent = `Q ${this.currentQuestionIndex + 1}/${this.currentQuestions.length}`;
+                    
+                    const answers = [question.correct, ...question.incorrect];
+                    this.shuffleArray(answers);
+                    
+                    const buttonsContainer = document.getElementById('answer-buttons');
+                    buttonsContainer.innerHTML = '';
+                    
+                    answers.forEach(answer => {
+                        const button = document.createElement('button');
+                        button.className = 'w-full text-left p-4 rounded-xl bg-white/50 hover:bg-white/70 transition-colors border border-gray-200';
+                        button.textContent = answer;
+                        button.addEventListener('click', () => this.handleAnswer(answer, question.correct));
+                        buttonsContainer.appendChild(button);
+                    });
+                    
+                    this.timeLeft = 30;
+                    this.updateTimer();
+                },
+                
+                handleAnswer(selected, correct) {
+                    audio.play('tap');
+                    haptics.light();
+                    
+                    const isCorrect = selected === correct;
+                    const buttons = document.querySelectorAll('#answer-buttons button');
+                    
+                    buttons.forEach(btn => {
+                        btn.disabled = true;
+                        if (btn.textContent === correct) {
+                            btn.classList.add('bg-green-500', 'text-white');
+                        } else if (btn.textContent === selected && !isCorrect) {
+                            btn.classList.add('bg-red-500', 'text-white');
+                        }
+                    });
+                    
+                    if (isCorrect) {
+                        this.score++;
+                        audio.play('correct');
+                        haptics.medium();
+                        toast.show('Correct! +10 XP', 'success');
+                        store.addXP(10);
+                    } else {
+                        audio.play('incorrect');
+                        haptics.light();
+                        toast.show('Incorrect!', 'error');
+                    }
+                    
+                    store.state.stats.questionsAnswered++;
+                    if (isCorrect) store.state.stats.correctAnswers++;
+                    
+                    setTimeout(() => {
+                        this.currentQuestionIndex++;
+                        this.showQuestion();
+                    }, 1500);
+                },
+                
+                startTimer() {
+                    this.timer = setInterval(() => {
+                        this.timeLeft--;
+                        this.updateTimer();
+                        
+                        if (this.timeLeft <= 0) {
+                            this.handleTimeout();
+                        }
+                    }, 1000);
+                },
+                
+                updateTimer() {
+                    document.getElementById('timer-text').textContent = this.timeLeft;
+                    const progress = this.timeLeft / 30;
+                    document.getElementById('timer-progress').style.strokeDashoffset = 283 * (1 - progress);
+                },
+                
+                handleTimeout() {
+                    clearInterval(this.timer);
+                    this.currentQuestionIndex++;
+                    this.showQuestion();
+                },
+                
+                endGame() {
+                    this.isPlaying = false;
+                    clearInterval(this.timer);
+                    
+                    const accuracy = (this.score / this.currentQuestions.length) * 100;
+                    const timeBonus = Math.floor(this.timeLeft * 0.5);
+                    const totalXP = this.score * 10 + timeBonus;
+                    const totalCoins = Math.floor(this.score * 2);
+                    
+                    if (accuracy === 100) {
+                        store.state.stats.perfectRounds++;
+                    }
+                    
+                    store.addXP(totalXP);
+                    store.addCoins(totalCoins);
+                    
+                    this.showEndGameModal(accuracy, timeBonus, totalXP, totalCoins);
+                },
+                
+                showEndGameModal(accuracy, timeBonus, totalXP, totalCoins) {
+                    const modal = document.getElementById('modal-overlay');
+                    const content = document.getElementById('modal-content');
+                    
+                    content.innerHTML = `
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Game Complete!</h3>
+                        <div class="space-y-3 mb-6">
+                            <div class="flex justify-between">
+                                <span>Score:</span>
+                                <span class="font-semibold">${this.score}/${this.currentQuestions.length}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Accuracy:</span>
+                                <span class="font-semibold">${accuracy.toFixed(1)}%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Time Bonus:</span>
+                                <span class="font-semibold">+${timeBonus} XP</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Total XP:</span>
+                                <span class="font-semibold">+${totalXP}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Coins Earned:</span>
+                                <span class="font-semibold">+${totalCoins}</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button id="replay-btn" class="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:scale-105 transition-transform">
+                                Replay
+                            </button>
+                            <button id="home-btn" class="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:scale-105 transition-transform">
+                                Home
+                            </button>
+                        </div>
+                    `;
+                    
+                    modal.classList.remove('hidden');
+                    
+                    document.getElementById('replay-btn').addEventListener('click', () => {
+                        modal.classList.add('hidden');
+                        this.startGame(9, 'medium', 10);
+                    });
+                    
+                    document.getElementById('home-btn').addEventListener('click', () => {
+                        modal.classList.add('hidden');
+                        router.navigate('home');
+                    });
+                },
+                
+                shuffleArray(array) {
+                    for (let i = array.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [array[i], array[j]] = [array[j], array[i]];
+                    }
+                }
+            };
+            
+            // ===== AUDIO SYSTEM =====
+            const audio = {
+                context: null,
+                buffers: {},
+                
+                async init() {
+                    try {
+                        this.context = new (window.AudioContext || window.webkitAudioContext)();
+                        await this.loadSounds();
+                    } catch (error) {
+                        console.warn('Audio not supported:', error);
+                    }
+                },
+                
+                async loadSounds() {
+                    const sounds = {
+                        tap: this.createBeep(800, 0.1),
+                        correct: this.createBeep(1200, 0.2),
+                        incorrect: this.createBeep(400, 0.3),
+                        levelup: this.createBeep(1500, 0.5)
+                    };
+                    
+                    for (const [name, buffer] of Object.entries(sounds)) {
+                        this.buffers[name] = buffer;
+                    }
+                },
+                
+                createBeep(frequency, duration) {
+                    const sampleRate = this.context.sampleRate;
+                    const length = sampleRate * duration;
+                    const buffer = this.context.createBuffer(1, length, sampleRate);
+                    const data = buffer.getChannelData(0);
+                    
+                    for (let i = 0; i < length; i++) {
+                        data[i] = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 0.3;
+                    }
+                    
+                    return buffer;
+                },
+                
+                play(soundName) {
+                    if (!store.state.settings.sound || !this.buffers[soundName]) return;
+                    
+                    try {
+                        const source = this.context.createBufferSource();
+                        source.buffer = this.buffers[soundName];
+                        source.connect(this.context.destination);
+                        source.start();
+                    } catch (error) {
+                        console.warn('Audio playback failed:', error);
+                    }
+                }
+            };
+            
+            // ===== HAPTICS SYSTEM =====
+            const haptics = {
+                init() {
+                    if (window.Capacitor?.Haptics) {
+                        this.capacitorHaptics = window.Capacitor.Haptics;
+                    }
+                },
+                
+                light() {
+                    if (!store.state.settings.haptics) return;
+                    
+                    if (this.capacitorHaptics) {
+                        this.capacitorHaptics.impact({ style: 'light' });
+                    } else if (navigator.vibrate) {
+                        navigator.vibrate(15);
+                    }
+                },
+                
+                medium() {
+                    if (!store.state.settings.haptics) return;
+                    
+                    if (this.capacitorHaptics) {
+                        this.capacitorHaptics.impact({ style: 'medium' });
+                    } else if (navigator.vibrate) {
+                        navigator.vibrate(25);
+                    }
+                },
+                
+                strong() {
+                    if (!store.state.settings.haptics) return;
+                    
+                    if (this.capacitorHaptics) {
+                        this.capacitorHaptics.impact({ style: 'heavy' });
+                    } else if (navigator.vibrate) {
+                        navigator.vibrate(50);
+                    }
+                }
+            };
+            
+            // ===== UTILITIES =====
+            const toast = {
+                show(message, type = 'info') {
+                    const container = document.getElementById('toast-container');
+                    const toast = document.createElement('div');
+                    toast.className = `glass-card rounded-lg p-4 text-white ${type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'}`;
+                    toast.textContent = message;
+                    
+                    container.appendChild(toast);
+                    
+                    setTimeout(() => {
+                        toast.remove();
+                    }, 3000);
+                }
+            };
+            
+            const confetti = {
+                burst() {
+                    const container = document.getElementById('confetti-container');
+                    const colors = ['#fbbf24', '#ef4444', '#3b82f6', '#10b981', '#8b5cf6'];
+                    
+                    for (let i = 0; i < 50; i++) {
+                        const piece = document.createElement('div');
+                        piece.className = 'confetti';
+                        piece.style.left = Math.random() * 100 + '%';
+                        piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                        piece.style.animationDelay = Math.random() * 0.5 + 's';
+                        piece.style.animationDuration = (Math.random() * 2 + 1) + 's';
+                        
+                        container.appendChild(piece);
+                        
+                        setTimeout(() => piece.remove(), 3000);
+                    }
+                }
+            };
+            
+            // ===== BEE BACKGROUND =====
+            const beeBackground = {
+                init() {
+                    this.createBees();
+                    this.animateBees();
+                },
+                
+                createBees() {
+                    const container = document.getElementById('bee-container');
+                    const beeCount = 8;
+                    
+                    for (let i = 0; i < beeCount; i++) {
+                        const bee = document.createElement('div');
+                        bee.className = 'bee absolute';
+                        bee.innerHTML = `
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M10 2C6.13 2 3 5.13 3 9c0 3.87 3.13 7 7 7s7-3.13 7-7c0-3.87-3.13-7-7-7z" fill="#fbbf24"/>
+                                <path d="M8 6h4v2H8V6z" fill="#8b4513"/>
+                                <path d="M7 8h6v1H7V8z" fill="#8b4513"/>
+                            </svg>
+                        `;
+                        
+                        bee.style.left = Math.random() * 100 + '%';
+                        bee.style.top = Math.random() * 100 + '%';
+                        bee.style.opacity = '0.3';
+                        
+                        container.appendChild(bee);
+                    }
+                },
+                
+                animateBees() {
+                    const bees = document.querySelectorAll('.bee');
+                    
+                    bees.forEach((bee, index) => {
+                        const timeline = gsap.timeline({ repeat: -1 });
+                        
+                        timeline.to(bee, {
+                            x: Math.random() * 200 - 100,
+                            y: Math.random() * 200 - 100,
+                            rotation: Math.random() * 360,
+                            duration: 10 + Math.random() * 20,
+                            ease: 'none'
+                        });
+                        
+                        timeline.to(bee, {
+                            scale: 0.8 + Math.random() * 0.4,
+                            duration: 2 + Math.random() * 3,
+                            ease: 'power2.inOut'
+                        }, '-=10');
+                    });
+                }
+            };
+            
+            // ===== EVENT LISTENERS =====
+            function initEventListeners() {
+                // Navigation
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        audio.play('tap');
+                        haptics.light();
+                        router.navigate(btn.dataset.screen);
+                    });
+                });
+                
+                // Quick start button
+                document.getElementById('quick-start-btn').addEventListener('click', () => {
+                    audio.play('tap');
+                    haptics.light();
+                    router.navigate('play');
+                });
+                
+                // Start game button
+                document.getElementById('start-game-btn').addEventListener('click', () => {
+                    audio.play('tap');
+                    haptics.light();
+                    const difficulty = document.querySelector('.difficulty-btn.active').dataset.difficulty;
+                    const amount = document.getElementById('question-count').value;
+                    game.startGame(9, difficulty, amount);
+                });
+                
+                // Difficulty buttons
+                document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        audio.play('tap');
+                        haptics.light();
+                        document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                    });
+                });
+                
+                // Settings toggles
+                document.getElementById('sound-toggle').addEventListener('click', () => {
+                    store.state.settings.sound = !store.state.settings.sound;
+                    const btn = document.getElementById('sound-toggle');
+                    btn.textContent = store.state.settings.sound ? 'ON' : 'OFF';
+                    btn.className = `toggle-btn ${store.state.settings.sound ? 'bg-green-500' : 'bg-gray-500'} text-white px-4 py-2 rounded-lg`;
+                    store.save();
+                });
+                
+                document.getElementById('haptics-toggle').addEventListener('click', () => {
+                    store.state.settings.haptics = !store.state.settings.haptics;
+                    const btn = document.getElementById('haptics-toggle');
+                    btn.textContent = store.state.settings.haptics ? 'ON' : 'OFF';
+                    btn.className = `toggle-btn ${store.state.settings.haptics ? 'bg-green-500' : 'bg-gray-500'} text-white px-4 py-2 rounded-lg`;
+                    store.save();
+                });
+                
+                // Reset data button
+                document.getElementById('reset-data-btn').addEventListener('click', () => {
+                    if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+                        localStorage.clear();
+                        location.reload();
+                    }
+                });
+                
+                // Store buy buttons
+                document.querySelectorAll('.buy-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const item = btn.dataset.item;
+                        const cost = parseInt(btn.dataset.cost);
+                        
+                        if (store.state.coins >= cost) {
+                            store.state.coins -= cost;
+                            store.state.inventory[item]++;
+                            store.save();
+                            store.updateUI();
+                            toast.show(`Purchased ${item}!`, 'success');
+                        } else {
+                            toast.show('Not enough coins!', 'error');
+                        }
+                    });
+                });
+            }
+            
+            // ===== INITIALIZATION =====
+            async function init() {
+                store.init();
+                router.init();
+                await audio.init();
+                haptics.init();
+                beeBackground.init();
+                initEventListeners();
+                
+                store.updateUI();
+                
+                console.log('QuizBee initialized successfully!');
+            }
+            
+            // Start the app when DOM is loaded
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+            
+        })();
+    </script>
+</body>
+</html>
